@@ -23,6 +23,7 @@ def list_articles(
     db: Session,
     *,
     category_slug: str | None = None,
+    search: str | None = None,
     offset: int = 0,
     limit: int = 20,
 ) -> tuple[Sequence[Article], int]:
@@ -30,6 +31,14 @@ def list_articles(
 
     if category_slug:
         query = query.join(Category).where(Category.slug == category_slug)
+
+    if search:
+        pattern = f"%{search}%"
+        query = query.where(
+            Article.title.ilike(pattern)
+            | Article.body_text.ilike(pattern)
+            | Article.excerpt.ilike(pattern)
+        )
 
     total = db.scalar(select(func.count()).select_from(query.subquery()))
     articles = db.scalars(query.offset(offset).limit(limit)).all()

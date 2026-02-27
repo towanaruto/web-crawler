@@ -62,13 +62,15 @@ export interface PaginatedArticles {
 export async function fetchArticles(
   offset = 0,
   limit = 20,
-  category?: string
+  category?: string,
+  search?: string
 ): Promise<PaginatedArticles> {
   const params = new URLSearchParams({
     offset: String(offset),
     limit: String(limit),
   });
   if (category) params.set("category", category);
+  if (search) params.set("search", search);
   const res = await fetch(`${getBaseUrl()}/api/articles?${params}`, {
     cache: "no-store",
   });

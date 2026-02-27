@@ -13,11 +13,14 @@ router = APIRouter(prefix="/api/articles", tags=["articles"])
 @router.get("", response_model=PaginatedArticles)
 def get_articles(
     category: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
     offset: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
-    articles, total = list_articles(db, category_slug=category, offset=offset, limit=limit)
+    articles, total = list_articles(
+        db, category_slug=category, search=search, offset=offset, limit=limit,
+    )
     return PaginatedArticles(items=articles, total=total, offset=offset, limit=limit)
 
 
