@@ -102,6 +102,9 @@ class CrawlTarget(Base):
     selector_config = Column(JSONB, default=dict)
     max_depth = Column(Integer, default=2)
     is_active = Column(Boolean, default=True)
+    keywords = Column(JSONB, default=list)
+    keyword_mode = Column(String(10), default="any")
+    schedule = Column(String(100), nullable=True)
 
     jobs = relationship("CrawlJob", back_populates="target")
 

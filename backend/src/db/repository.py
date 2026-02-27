@@ -126,6 +126,9 @@ def add_crawl_target(
     crawl_mode: str = "static",
     selector_config: dict | None = None,
     max_depth: int = 2,
+    keywords: list[str] | None = None,
+    keyword_mode: str = "any",
+    schedule: str | None = None,
 ) -> CrawlTarget:
     existing = db.scalar(
         select(CrawlTarget).where(CrawlTarget.base_url == base_url)
@@ -136,6 +139,9 @@ def add_crawl_target(
             existing.selector_config = selector_config
         existing.max_depth = max_depth
         existing.is_active = True
+        existing.keywords = keywords or existing.keywords or []
+        existing.keyword_mode = keyword_mode
+        existing.schedule = schedule
         db.flush()
         return existing
 
@@ -144,6 +150,9 @@ def add_crawl_target(
         crawl_mode=crawl_mode,
         selector_config=selector_config or {},
         max_depth=max_depth,
+        keywords=keywords or [],
+        keyword_mode=keyword_mode,
+        schedule=schedule,
     )
     db.add(target)
     db.flush()

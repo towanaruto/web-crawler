@@ -18,6 +18,7 @@ from src.db.repository import (
     upsert_article,
 )
 from src.parser.html_parser import parse_article
+from src.parser.keyword_filter import matches_keywords
 from src.scheduler.rate_limiter import TokenBucketRateLimiter
 from src.scheduler.robots import can_fetch
 
@@ -60,6 +61,20 @@ def crawl_target(db: Session, target: CrawlTarget, rate_limiter: TokenBucketRate
 
         selector_overrides = target.selector_config if target.selector_config else None
         parsed = parse_article(result.html, result.url, selector_overrides)
+
+        target_keywords = target.keywords or []
+        target_keyword_mode = target.keyword_mode or "any"
+        if not matches_keywords(parsed, target_keywords, target_keyword_mode):
+            logger.info("Skipped %s (keyword filter)", target.base_url)
+            update_crawl_job(
+                db, job,
+                status="completed",
+                http_status_code=result.status_code,
+                articles_found=0,
+                finished_at=datetime.now(timezone.utc),
+            )
+            db.commit()
+            return 0
 
         if parsed["title"]:
             article_data = {
