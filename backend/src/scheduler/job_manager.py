@@ -154,13 +154,19 @@ def crawl_target(db: Session, target: CrawlTarget, rate_limiter: TokenBucketRate
 
             except Exception as e:
                 logger.exception("Error crawling %s", url)
-                update_crawl_job(
-                    db, job,
-                    status="failed",
-                    error_message=str(e),
-                    finished_at=datetime.now(timezone.utc),
-                )
-                db.commit()
+                db.rollback()
+                try:
+                    job = create_crawl_job(db, target.id, url)
+                    update_crawl_job(
+                        db, job,
+                        status="failed",
+                        error_message=str(e)[:500],
+                        finished_at=datetime.now(timezone.utc),
+                    )
+                    db.commit()
+                except Exception:
+                    logger.exception("Failed to record error for %s", url)
+                    db.rollback()
 
     return articles_count
 
@@ -184,6 +190,7 @@ def crawl_all(db: Session) -> dict:
             total_articles += count
         except Exception:
             logger.exception("Fatal error crawling target %s", target.base_url)
+            db.rollback()
             failed += 1
 
     return {
