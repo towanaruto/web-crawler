@@ -7,9 +7,12 @@ export default function Header() {
         <Link href="/" style={styles.logo}>
           Web Crawler CMS
         </Link>
-        <nav>
+        <nav style={{ display: "flex", gap: 16 }}>
           <Link href="/" style={styles.navLink}>
             Articles
+          </Link>
+          <Link href="/targets" style={styles.navLink}>
+            Targets
           </Link>
         </nav>
       </div>

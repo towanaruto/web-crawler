@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic_settings import BaseSettings
 
 
@@ -8,12 +10,22 @@ class Settings(BaseSettings):
     DB_USER: str = "myuser"
     DB_PASSWORD: str = "mypassword"
 
+    DATABASE_URL: Optional[str] = None
+    DB_REQUIRE_SSL: bool = False
+    MIGRATION_DATABASE_URL: Optional[str] = None
+
     @property
     def database_url(self) -> str:
+        if self.DATABASE_URL:
+            return self.DATABASE_URL
         return (
             f"postgresql://{self.DB_USER}:{self.DB_PASSWORD}"
             f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
         )
+
+    @property
+    def migration_database_url(self) -> str:
+        return self.MIGRATION_DATABASE_URL or self.database_url
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

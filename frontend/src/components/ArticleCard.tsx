@@ -1,19 +1,56 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Article } from "@/lib/api";
+import { deleteArticleAction } from "@/app/actions";
 
 export default function ArticleCard({ article }: { article: Article }) {
+  const router = useRouter();
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDelete() {
+    if (!confirm(`"${article.title}" を削除しますか？`)) return;
+    setDeleting(true);
+    try {
+      await deleteArticleAction(article.id);
+      router.refresh();
+    } catch {
+      alert("削除に失敗しました");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <article style={styles.card}>
-      <Link href={`/articles/${article.slug}`} style={styles.title}>
-        {article.title}
-      </Link>
+      <div style={styles.header}>
+        <Link href={`/articles/${article.slug}`} style={styles.title}>
+          {article.title}
+        </Link>
+        <button
+          onClick={handleDelete}
+          disabled={deleting}
+          style={styles.deleteBtn}
+        >
+          {deleting ? "..." : "Delete"}
+        </button>
+      </div>
       <div style={styles.meta}>
+        {article.crawled_at && (
+          <time style={styles.crawledAt}>
+            Crawled: {new Date(article.crawled_at).toLocaleString()}
+          </time>
+        )}
         {article.author && <span>{article.author.name}</span>}
         {article.category && (
           <span style={styles.category}>{article.category.name}</span>
         )}
         {article.published_at && (
-          <time>{new Date(article.published_at).toLocaleDateString()}</time>
+          <time>
+            Published: {new Date(article.published_at).toLocaleDateString()}
+          </time>
         )}
       </div>
       {article.excerpt && <p style={styles.excerpt}>{article.excerpt}</p>}
@@ -35,11 +72,27 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "24px 0",
     borderBottom: "1px solid #e5e7eb",
   },
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+  },
   title: {
     fontSize: 20,
     fontWeight: 600,
     textDecoration: "none",
     color: "#111",
+  },
+  deleteBtn: {
+    backgroundColor: "transparent",
+    color: "#999",
+    border: "1px solid #e5e7eb",
+    borderRadius: 4,
+    padding: "4px 10px",
+    cursor: "pointer",
+    fontSize: 12,
+    flexShrink: 0,
   },
   meta: {
     display: "flex",
@@ -47,6 +100,11 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: 8,
     fontSize: 14,
     color: "#666",
+    flexWrap: "wrap" as const,
+  },
+  crawledAt: {
+    color: "#0369a1",
+    fontWeight: 500,
   },
   category: {
     backgroundColor: "#f0f0f0",

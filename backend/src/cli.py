@@ -2,6 +2,7 @@ import logging
 
 import typer
 
+from src.config.settings import settings
 from src.db.engine import get_session
 from src.db.models import Base
 from src.db.engine import engine
@@ -16,6 +17,12 @@ app = typer.Typer(help="Web Crawler CLI")
 @app.command()
 def init_db():
     """Create all database tables."""
+    if settings.DATABASE_URL:
+        typer.echo(
+            "DATABASE_URL is set — schema is managed by Alembic.\n"
+            "Run: alembic upgrade head"
+        )
+        raise typer.Exit(code=1)
     Base.metadata.create_all(engine)
     typer.echo("Database tables created.")
 

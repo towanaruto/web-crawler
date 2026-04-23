@@ -1,6 +1,7 @@
 services:
   db:
     image: postgres:16
+    profiles: ["local-db"]
     environment:
       POSTGRES_DB: ${DB_NAME:-web_crawler}
       POSTGRES_USER: ${DB_USER:-myuser}
@@ -20,12 +21,9 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_NAME: ${DB_NAME:-web_crawler}
-      DB_USER: ${DB_USER:-myuser}
-      DB_PASSWORD: ${DB_PASSWORD:-mypassword}
+        required: false
+    env_file:
+      - .env
     ports:
       - "8000:8000"
     volumes:

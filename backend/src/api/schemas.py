@@ -39,6 +39,7 @@ class ArticleListItem(BaseModel):
     category: Optional[CategoryOut]
     tags: List[TagOut]
     published_at: Optional[datetime]
+    crawled_at: Optional[datetime]
     featured_image_url: Optional[str]
     word_count: Optional[int]
     status: str
@@ -73,3 +74,26 @@ class CrawlResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     db: str
+
+
+class CrawlTargetOut(BaseModel):
+    id: UUID
+    base_url: str
+    crawl_mode: str
+    max_depth: int
+    is_active: bool
+    keywords: List[str]
+    keyword_mode: str
+    schedule: Optional[str]
+    selector_config: dict
+
+    model_config = {"from_attributes": True}
+
+
+class CrawlTargetCreate(BaseModel):
+    base_url: str
+    crawl_mode: str = "static"
+    max_depth: int = 2
+    keywords: List[str] = []
+    keyword_mode: str = "any"
+    schedule: Optional[str] = None

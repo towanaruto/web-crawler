@@ -3,15 +3,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.api.routes import articles, categories, health, scheduler
-from src.db.engine import engine
-from src.db.models import Base
+from src.api.routes import articles, categories, health, scheduler, targets
 from src.scheduler.cron_scheduler import start_scheduler, shutdown_scheduler
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    Base.metadata.create_all(engine)
     start_scheduler()
     yield
     shutdown_scheduler()
@@ -31,6 +28,7 @@ app.include_router(health.router)
 app.include_router(articles.router)
 app.include_router(categories.router)
 app.include_router(scheduler.router)
+app.include_router(targets.router)
 
 
 @app.post("/api/crawl")

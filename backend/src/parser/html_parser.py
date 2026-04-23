@@ -5,20 +5,45 @@ from datetime import datetime
 from urllib.parse import urljoin, urlparse
 
 import bleach
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Comment
 
 from src.parser.selectors import get_selectors
+from src.parser.url_utils import canonicalize_url
+
+# Tags whose text content is not visible prose and must be removed before any
+# downstream extraction. bleach's strip=True alone is not enough: it removes
+# the tag but preserves the inner text, so JSON-LD payloads and CSS rules leak
+# into body_html / body_text.
+_NOISE_TAGS = ("script", "style", "noscript", "template")
+
+
+def _strip_noise(soup: BeautifulSoup) -> None:
+    for tag in soup.find_all(_NOISE_TAGS):
+        tag.decompose()
+    for comment in soup.find_all(string=lambda t: isinstance(t, Comment)):
+        comment.extract()
 
 
 def parse_article(html: str, source_url: str, selector_overrides: dict | None = None) -> dict:
     """Parse raw HTML into a structured article dict."""
+    source_url = canonicalize_url(source_url)
     domain = urlparse(source_url).netloc
     selectors = get_selectors(domain, selector_overrides)
     soup = BeautifulSoup(html, "lxml")
+    _strip_noise(soup)
+
+    link_canonical = soup.find("link", rel="canonical")
+    if link_canonical and link_canonical.get("href"):
+        source_url = canonicalize_url(urljoin(source_url, link_canonical["href"]))
 
     title = _extract_text(soup, selectors["title"]) or _extract_og(soup, "og:title") or ""
     body_element = soup.select_one(selectors["body"])
-    body_html = _sanitize_html(str(body_element)) if body_element else ""
+    image_urls = _extract_images(body_element, source_url) if body_element else []
+    if body_element:
+        for img in body_element.find_all("img"):
+            img.decompose()
+    prose_html = _sanitize_html(str(body_element)) if body_element else ""
+    body_html = _append_image_list(prose_html, image_urls)
     body_text = body_element.get_text(separator="\n", strip=True) if body_element else ""
 
     excerpt = _extract_meta(soup, selectors["excerpt"]) or body_text[:200]
@@ -98,13 +123,16 @@ def _extract_datetime(soup: BeautifulSoup, selector: str) -> datetime | None:
 
 
 def _extract_links(soup: BeautifulSoup, base_url: str) -> list[str]:
-    links = []
+    links: list[str] = []
+    seen: set[str] = set()
     for a in soup.select("a[href]"):
         href = a.get("href", "")
-        if href and not href.startswith(("#", "javascript:", "mailto:")):
-            full_url = urljoin(base_url, href)
-            if full_url not in links:
-                links.append(full_url)
+        if not href or href.startswith(("#", "javascript:", "mailto:")):
+            continue
+        full = canonicalize_url(urljoin(base_url, href))
+        if full not in seen:
+            seen.add(full)
+            links.append(full)
     return links
 
 
@@ -121,3 +149,59 @@ ALLOWED_ATTRS = {
 
 def _sanitize_html(html: str) -> str:
     return bleach.clean(html, tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRS, strip=True)
+
+
+def _extract_images(body_element, base_url: str) -> list[str]:
+    """Collect absolute image URLs from <img> tags, handling lazy-load attrs
+    and srcset. Preserves document order, deduplicates."""
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for img in body_element.find_all("img"):
+        url = _resolve_img_url(img, base_url)
+        if url and url not in seen:
+            seen.add(url)
+            ordered.append(url)
+    return ordered
+
+
+def _resolve_img_url(img, base_url: str) -> str | None:
+    # Preference order: srcset (largest) → src → data-src → data-original.
+    srcset = img.get("srcset")
+    if srcset:
+        best = _pick_largest_srcset(srcset)
+        if best:
+            return urljoin(base_url, best)
+    for attr in ("src", "data-src", "data-original"):
+        val = img.get(attr)
+        if val:
+            return urljoin(base_url, val.strip())
+    return None
+
+
+def _pick_largest_srcset(srcset: str) -> str | None:
+    """srcset syntax: '<url> <descriptor>, ...'. Pick the URL with the largest
+    width descriptor (e.g. '1200w' beats '400w'). Fall back to last entry."""
+    best_url = None
+    best_w = -1
+    for candidate in srcset.split(","):
+        parts = candidate.strip().split()
+        if not parts:
+            continue
+        url = parts[0]
+        width = 0
+        if len(parts) > 1 and parts[1].endswith("w"):
+            try:
+                width = int(parts[1][:-1])
+            except ValueError:
+                width = 0
+        if width > best_w:
+            best_w = width
+            best_url = url
+    return best_url
+
+
+def _append_image_list(prose_html: str, urls: list[str]) -> str:
+    if not urls:
+        return prose_html
+    items = "".join(f'<li><img src="{url}" alt=""></li>' for url in urls)
+    return f"{prose_html.rstrip()}\n<ul>{items}</ul>"

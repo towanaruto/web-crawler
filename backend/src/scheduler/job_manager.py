@@ -3,7 +3,9 @@ from __future__ import annotations
 import logging
 from collections import deque
 from datetime import datetime, timezone
-from urllib.parse import urldefrag, urlparse
+from urllib.parse import urlparse
+
+from src.parser.url_utils import canonicalize_url
 
 from sqlalchemy.orm import Session
 
@@ -33,12 +35,13 @@ def _is_same_domain(base_url: str, candidate_url: str) -> bool:
     return urlparse(base_url).netloc.lower() == urlparse(candidate_url).netloc.lower()
 
 
-def crawl_target(db: Session, target: CrawlTarget, rate_limiter: TokenBucketRateLimiter) -> int:
-    """Crawl a single target using BFS link traversal. Returns articles count."""
+def crawl_target(db: Session, target: CrawlTarget, rate_limiter: TokenBucketRateLimiter) -> dict:
+    """Crawl a single target using BFS link traversal. Returns crawl stats."""
     max_depth = target.max_depth if target.max_depth is not None else 2
     articles_count = 0
+    pages_crawled = 0
 
-    base_url_clean, _ = urldefrag(target.base_url)
+    base_url_clean = canonicalize_url(target.base_url)
     queue: deque[tuple[str, int]] = deque([(base_url_clean, 0)])
     visited: set[str] = {base_url_clean}
 
@@ -66,6 +69,11 @@ def crawl_target(db: Session, target: CrawlTarget, rate_limiter: TokenBucketRate
                     continue
 
                 rate_limiter.acquire()
+                pages_crawled += 1
+                logger.info(
+                    "Fetching %s (depth=%d/%d, pages=%d)",
+                    url, depth, max_depth, pages_crawled,
+                )
                 result = crawler.fetch(url)
 
                 if result.error:
@@ -86,7 +94,7 @@ def crawl_target(db: Session, target: CrawlTarget, rate_limiter: TokenBucketRate
                 # individual articles that do.
                 if depth < max_depth:
                     for link in parsed.get("links", []):
-                        clean_link, _ = urldefrag(link)
+                        clean_link = canonicalize_url(link)
                         if (
                             clean_link not in visited
                             and _is_same_domain(target.base_url, clean_link)
@@ -168,7 +176,12 @@ def crawl_target(db: Session, target: CrawlTarget, rate_limiter: TokenBucketRate
                     logger.exception("Failed to record error for %s", url)
                     db.rollback()
 
-    return articles_count
+    return {
+        "articles": articles_count,
+        "pages_crawled": pages_crawled,
+        "max_depth_used": max_depth,
+        "keywords_used": target_keywords,
+    }
 
 
 def crawl_all(db: Session) -> dict:
@@ -177,17 +190,25 @@ def crawl_all(db: Session) -> dict:
     rate_limiter = TokenBucketRateLimiter(rate=1.0, capacity=5)
 
     total_articles = 0
+    total_pages = 0
     total_targets = len(targets)
     failed = 0
 
     for target in targets:
         logger.info(
-            "Crawling target: %s (mode=%s, max_depth=%s)",
+            "Crawling target: %s (mode=%s, max_depth=%s, keywords=%s)",
             target.base_url, target.crawl_mode, target.max_depth,
+            target.keywords or "(none)",
         )
         try:
-            count = crawl_target(db, target, rate_limiter)
-            total_articles += count
+            stats = crawl_target(db, target, rate_limiter)
+            total_articles += stats["articles"]
+            total_pages += stats["pages_crawled"]
+            logger.info(
+                "Finished %s — pages=%d, articles=%d, max_depth=%d, keywords=%s",
+                target.base_url, stats["pages_crawled"], stats["articles"],
+                stats["max_depth_used"], stats["keywords_used"] or "(none)",
+            )
         except Exception:
             logger.exception("Fatal error crawling target %s", target.base_url)
             db.rollback()
@@ -196,5 +217,6 @@ def crawl_all(db: Session) -> dict:
     return {
         "targets_crawled": total_targets,
         "articles_found": total_articles,
+        "pages_crawled": total_pages,
         "failed": failed,
     }

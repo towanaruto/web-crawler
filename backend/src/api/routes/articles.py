@@ -1,11 +1,12 @@
 from typing import Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from src.api.schemas import ArticleDetail, PaginatedArticles
+from src.api.schemas import ArticleDetail, ArticleListItem, PaginatedArticles
 from src.db.engine import get_db
-from src.db.repository import get_article_by_slug, list_articles
+from src.db.repository import delete_article, get_article_by_slug, list_articles
 
 router = APIRouter(prefix="/api/articles", tags=["articles"])
 
@@ -29,4 +30,13 @@ def get_article(slug: str, db: Session = Depends(get_db)):
     article = get_article_by_slug(db, slug)
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
+    return article
+
+
+@router.delete("/{article_id}", response_model=ArticleListItem)
+def remove_article(article_id: UUID, db: Session = Depends(get_db)):
+    article = delete_article(db, article_id)
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+    db.commit()
     return article

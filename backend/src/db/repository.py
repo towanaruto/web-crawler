@@ -27,7 +27,7 @@ def list_articles(
     offset: int = 0,
     limit: int = 20,
 ) -> tuple[Sequence[Article], int]:
-    query = select(Article).order_by(Article.published_at.desc().nullslast())
+    query = select(Article).order_by(Article.crawled_at.desc().nullslast())
 
     if category_slug:
         query = query.join(Category).where(Category.slug == category_slug)
@@ -74,6 +74,14 @@ def upsert_article(db: Session, data: dict) -> Article:
     article = Article(**data)
     db.add(article)
     db.flush()
+    return article
+
+
+def delete_article(db: Session, article_id: uuid.UUID) -> Article | None:
+    article = db.get(Article, article_id)
+    if article:
+        db.delete(article)
+        db.flush()
     return article
 
 
@@ -148,7 +156,7 @@ def add_crawl_target(
             existing.selector_config = selector_config
         existing.max_depth = max_depth
         existing.is_active = True
-        existing.keywords = keywords or existing.keywords or []
+        existing.keywords = keywords if keywords is not None else (existing.keywords or [])
         existing.keyword_mode = keyword_mode
         existing.schedule = schedule
         db.flush()
@@ -165,6 +173,14 @@ def add_crawl_target(
     )
     db.add(target)
     db.flush()
+    return target
+
+
+def deactivate_crawl_target(db: Session, target_id: uuid.UUID) -> CrawlTarget | None:
+    target = db.get(CrawlTarget, target_id)
+    if target:
+        target.is_active = False
+        db.flush()
     return target
 
 

@@ -7,7 +7,10 @@ from typing import Generator
 
 from src.config.settings import settings
 
-engine = create_engine(settings.database_url, pool_pre_ping=True)
+connect_args = {"sslmode": "require"} if settings.DB_REQUIRE_SSL else {}
+engine = create_engine(
+    settings.database_url, pool_pre_ping=True, connect_args=connect_args
+)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
 

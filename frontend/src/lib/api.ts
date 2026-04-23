@@ -41,6 +41,7 @@ export interface Article {
   category: Category | null;
   tags: Tag[];
   published_at: string | null;
+  crawled_at: string | null;
   featured_image_url: string | null;
   word_count: number | null;
   status: string;
@@ -89,6 +90,76 @@ export async function fetchArticle(slug: string): Promise<ArticleDetail> {
 export async function fetchCategories(): Promise<Category[]> {
   const res = await fetch(`${getBaseUrl()}/api/categories`, {
     cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+export interface CrawlTarget {
+  id: string;
+  base_url: string;
+  crawl_mode: string;
+  max_depth: number;
+  is_active: boolean;
+  keywords: string[];
+  keyword_mode: string;
+  schedule: string | null;
+  selector_config: Record<string, unknown>;
+}
+
+export interface CrawlTargetCreate {
+  base_url: string;
+  crawl_mode?: string;
+  max_depth?: number;
+  keywords?: string[];
+  keyword_mode?: string;
+  schedule?: string | null;
+}
+
+export async function fetchCrawlTargets(): Promise<CrawlTarget[]> {
+  const res = await fetch(`${getBaseUrl()}/api/targets`, {
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+export async function createCrawlTarget(
+  data: CrawlTargetCreate
+): Promise<CrawlTarget> {
+  const res = await fetch(`${getBaseUrl()}/api/targets`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+export async function deleteArticle(id: string): Promise<void> {
+  const res = await fetch(`${getBaseUrl()}/api/articles/${id}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+}
+
+export async function deleteCrawlTarget(id: string): Promise<void> {
+  const res = await fetch(`${getBaseUrl()}/api/targets/${id}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+}
+
+export interface CrawlResult {
+  targets_crawled: number;
+  articles_found: number;
+  pages_crawled: number;
+  failed: number;
+}
+
+export async function triggerCrawl(): Promise<CrawlResult> {
+  const res = await fetch(`${getBaseUrl()}/api/crawl`, {
+    method: "POST",
   });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
