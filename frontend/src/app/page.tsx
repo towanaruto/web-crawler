@@ -1,7 +1,7 @@
-import { fetchArticles } from "@/lib/api";
 import ArticleList from "@/components/ArticleList";
 import Pagination from "@/components/Pagination";
 import SearchBar from "@/components/SearchBar";
+import { listArticles, type ArticleListItem } from "@/db/queries";
 
 export default async function HomePage({
   searchParams,
@@ -13,14 +13,14 @@ export default async function HomePage({
   const limit = 20;
   const offset = (currentPage - 1) * limit;
 
-  let articles;
+  let items: ArticleListItem[] = [];
   let total = 0;
   try {
-    const data = await fetchArticles(offset, limit, undefined, q);
-    articles = data.items;
+    const data = await listArticles({ search: q, offset, limit });
+    items = data.items;
     total = data.total;
   } catch {
-    articles = [];
+    // swallow — empty state is rendered below.
   }
 
   const totalPages = Math.ceil(total / limit);
@@ -35,7 +35,7 @@ export default async function HomePage({
         {total} articles found
         {q ? ` for "${q}"` : ""}
       </p>
-      <ArticleList articles={articles} />
+      <ArticleList articles={items} />
       <Pagination currentPage={currentPage} totalPages={totalPages} query={q} />
     </div>
   );

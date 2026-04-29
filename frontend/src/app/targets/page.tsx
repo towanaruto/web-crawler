@@ -1,14 +1,14 @@
-import { fetchCrawlTargets } from "@/lib/api";
-import CrawlTargetList from "@/components/CrawlTargetList";
 import AddTargetForm from "@/components/AddTargetForm";
 import CrawlButton from "@/components/CrawlButton";
+import CrawlTargetList from "@/components/CrawlTargetList";
+import { listActiveCrawlTargets, type CrawlTargetItem } from "@/db/queries";
 
 export default async function TargetsPage() {
-  let targets;
+  let targets: CrawlTargetItem[] = [];
   try {
-    targets = await fetchCrawlTargets();
+    targets = await listActiveCrawlTargets();
   } catch {
-    targets = [];
+    // empty list rendered below
   }
 
   return (

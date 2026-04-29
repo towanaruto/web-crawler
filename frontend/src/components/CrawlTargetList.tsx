@@ -1,22 +1,35 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CrawlTarget } from "@/lib/api";
-import { deactivateTargetAction } from "@/app/targets/actions";
+import type { CrawlTargetItem } from "@/db/queries";
+import { crawlAction, deactivateTargetAction } from "@/app/targets/actions";
 
 export default function CrawlTargetList({
   targets,
 }: {
-  targets: CrawlTarget[];
+  targets: CrawlTargetItem[];
 }) {
   const router = useRouter();
+  const [crawling, setCrawling] = useState<string | null>(null);
 
   async function handleDeactivate(id: string) {
     try {
       await deactivateTargetAction(id);
       router.refresh();
-    } catch (e) {
+    } catch {
       alert("Failed to deactivate target");
+    }
+  }
+
+  async function handleCrawlOne(id: string) {
+    setCrawling(id);
+    try {
+      await crawlAction(id);
+    } catch {
+      alert("Failed to dispatch crawl");
+    } finally {
+      setCrawling(null);
     }
   }
 
@@ -34,26 +47,35 @@ export default function CrawlTargetList({
         <div key={t.id} style={styles.card}>
           <div style={styles.cardHeader}>
             <a
-              href={t.base_url}
+              href={t.baseUrl}
               target="_blank"
               rel="noopener noreferrer"
               style={styles.url}
             >
-              {t.base_url}
+              {t.baseUrl}
             </a>
-            <button
-              onClick={() => handleDeactivate(t.id)}
-              style={styles.deactivateBtn}
-            >
-              Deactivate
-            </button>
+            <div style={styles.actions}>
+              <button
+                onClick={() => handleCrawlOne(t.id)}
+                disabled={crawling === t.id}
+                style={styles.crawlBtn}
+              >
+                {crawling === t.id ? "Queuing..." : "Crawl this"}
+              </button>
+              <button
+                onClick={() => handleDeactivate(t.id)}
+                style={styles.deactivateBtn}
+              >
+                Deactivate
+              </button>
+            </div>
           </div>
           <div style={styles.meta}>
-            <span style={styles.badge}>{t.crawl_mode}</span>
-            <span style={styles.detail}>Depth: {t.max_depth}</span>
+            <span style={styles.badge}>{t.crawlMode}</span>
+            <span style={styles.detail}>Depth: {t.maxDepth}</span>
             {t.keywords.length > 0 && (
               <span style={styles.detail}>
-                Keywords ({t.keyword_mode}): {t.keywords.join(", ")}
+                Keywords ({t.keywordMode}): {t.keywords.join(", ")}
               </span>
             )}
             {t.schedule && (
@@ -89,6 +111,19 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#0369a1",
     textDecoration: "none",
     fontSize: 15,
+  },
+  actions: {
+    display: "flex",
+    gap: 8,
+  },
+  crawlBtn: {
+    backgroundColor: "#0369a1",
+    color: "#fff",
+    border: "none",
+    borderRadius: 4,
+    padding: "6px 12px",
+    cursor: "pointer",
+    fontSize: 13,
   },
   deactivateBtn: {
     backgroundColor: "#dc2626",

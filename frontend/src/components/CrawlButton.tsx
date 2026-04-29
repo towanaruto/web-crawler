@@ -11,12 +11,10 @@ export default function CrawlButton() {
     setLoading(true);
     setResult(null);
     try {
-      const res = await crawlAction();
-      setResult(
-        `Crawled ${res.targets_crawled} targets, ${res.pages_crawled} pages fetched, found ${res.articles_found} articles, ${res.failed} failed`
-      );
+      await crawlAction();
+      setResult("Queued — see GitHub Actions tab for progress.");
     } catch {
-      setResult("Crawl failed");
+      setResult("Failed to dispatch crawl workflow.");
     } finally {
       setLoading(false);
     }
@@ -25,7 +23,7 @@ export default function CrawlButton() {
   return (
     <div style={styles.wrapper}>
       <button onClick={handleCrawl} disabled={loading} style={styles.btn}>
-        {loading ? "Crawling..." : "Crawl Now"}
+        {loading ? "Queuing..." : "Crawl Now"}
       </button>
       {result && <span style={styles.result}>{result}</span>}
     </div>

@@ -3,10 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Article } from "@/lib/api";
+import type { ArticleListItem } from "@/db/queries";
 import { deleteArticleAction } from "@/app/actions";
 
-export default function ArticleCard({ article }: { article: Article }) {
+export default function ArticleCard({ article }: { article: ArticleListItem }) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
 
@@ -38,18 +38,18 @@ export default function ArticleCard({ article }: { article: Article }) {
         </button>
       </div>
       <div style={styles.meta}>
-        {article.crawled_at && (
+        {article.crawledAt && (
           <time style={styles.crawledAt}>
-            Crawled: {new Date(article.crawled_at).toLocaleString()}
+            Crawled: {new Date(article.crawledAt).toLocaleString()}
           </time>
         )}
         {article.author && <span>{article.author.name}</span>}
         {article.category && (
           <span style={styles.category}>{article.category.name}</span>
         )}
-        {article.published_at && (
+        {article.publishedAt && (
           <time>
-            Published: {new Date(article.published_at).toLocaleDateString()}
+            Published: {new Date(article.publishedAt).toLocaleDateString()}
           </time>
         )}
       </div>

@@ -1,5 +1,6 @@
-import { fetchArticle } from "@/lib/api";
 import { notFound } from "next/navigation";
+
+import { getArticleBySlug } from "@/db/queries";
 
 export default async function ArticlePage({
   params,
@@ -7,12 +8,8 @@ export default async function ArticlePage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  let article;
-  try {
-    article = await fetchArticle(slug);
-  } catch {
-    notFound();
-  }
+  const article = await getArticleBySlug(slug);
+  if (!article) notFound();
 
   return (
     <article>
@@ -21,10 +18,8 @@ export default async function ArticlePage({
       </h1>
       <div style={styles.meta}>
         {article.author && <span>By {article.author.name}</span>}
-        {article.published_at && (
-          <time>
-            {new Date(article.published_at).toLocaleDateString()}
-          </time>
+        {article.publishedAt && (
+          <time>{new Date(article.publishedAt).toLocaleDateString()}</time>
         )}
         {article.category && <span>{article.category.name}</span>}
       </div>
@@ -37,23 +32,23 @@ export default async function ArticlePage({
           ))}
         </div>
       )}
-      {article.body_html ? (
+      {article.bodyHtml ? (
         <div
           style={styles.body}
-          dangerouslySetInnerHTML={{ __html: article.body_html }}
+          dangerouslySetInnerHTML={{ __html: article.bodyHtml }}
         />
       ) : (
         <div style={styles.body}>
-          <p>{article.body_text}</p>
+          <p>{article.bodyText}</p>
         </div>
       )}
       <footer style={styles.footer}>
-        <a href={article.source_url} target="_blank" rel="noopener noreferrer">
+        <a href={article.sourceUrl} target="_blank" rel="noopener noreferrer">
           Original source
         </a>
-        {article.crawled_at && (
+        {article.crawledAt && (
           <span>
-            Crawled: {new Date(article.crawled_at).toLocaleDateString()}
+            Crawled: {new Date(article.crawledAt).toLocaleDateString()}
           </span>
         )}
       </footer>
