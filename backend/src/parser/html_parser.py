@@ -68,6 +68,7 @@ def parse_article(html: str, source_url: str, selector_overrides: dict | None = 
         "tag_names": tags,
         "word_count": len(body_text.split()) if body_text else 0,
         "links": links,
+        "image_urls": image_urls,
     }
 
 

@@ -137,3 +137,28 @@ class TestCanonicalization:
         """
         result = parse_article(html, "https://example.com/a")
         assert "https://example.com/b?id=1" in result["links"]
+
+
+class TestImageUrlsExposed:
+    def test_image_urls_returned_as_list(self):
+        result = parse_article(HTML_WITH_NOISE, BASE)
+        # All resolved absolute URLs (same as embedded in <ul>) should be
+        # exposed for the crawler to download.
+        assert isinstance(result["image_urls"], list)
+        assert "https://example.com/a.jpg" in result["image_urls"]
+        assert "https://example.com/b.jpg" in result["image_urls"]
+        assert "https://example.com/large.jpg" in result["image_urls"]
+
+    def test_image_urls_dedup_preserves_order(self):
+        html = """
+        <html><body><article>
+          <img src="/a.jpg">
+          <img src="/b.jpg">
+          <img src="/a.jpg">
+        </article></body></html>
+        """
+        result = parse_article(html, "https://example.com/")
+        assert result["image_urls"] == [
+            "https://example.com/a.jpg",
+            "https://example.com/b.jpg",
+        ]

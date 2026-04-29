@@ -24,6 +24,8 @@ from src.parser.html_parser import parse_article
 from src.parser.keyword_filter import matches_keywords
 from src.scheduler.rate_limiter import TokenBucketRateLimiter
 from src.scheduler.robots import can_fetch
+from src.storage.image_fetcher import ImageTooLarge, fetch_image
+from src.storage.r2 import R2Storage
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +37,69 @@ def _is_same_domain(base_url: str, candidate_url: str) -> bool:
     return urlparse(base_url).netloc.lower() == urlparse(candidate_url).netloc.lower()
 
 
-def crawl_target(db: Session, target: CrawlTarget, rate_limiter: TokenBucketRateLimiter) -> dict:
+def _persist_article(db: Session, parsed: dict, r2: R2Storage | None) -> int:
+    """Insert or update an article from parsed dict, optionally pushing the
+    raw HTML and inline images to R2. Returns 1 if an article was saved, else 0.
+    """
+    if not parsed.get("title"):
+        return 0
+
+    article_data = {
+        "title": parsed["title"],
+        "body_html": parsed["body_html"],
+        "body_text": parsed["body_text"],
+        "raw_html": parsed["raw_html"] if r2 is None else None,
+        "excerpt": parsed["excerpt"],
+        "source_url": parsed["source_url"],
+        "published_at": parsed["published_at"],
+        "featured_image_url": parsed["featured_image_url"],
+        "word_count": parsed["word_count"],
+        "crawled_at": datetime.now(timezone.utc),
+        "status": "draft",
+    }
+
+    if parsed.get("author_name"):
+        author = get_or_create_author(db, parsed["author_name"])
+        article_data["author_id"] = author.id
+
+    if parsed.get("category_names"):
+        category = get_or_create_category(db, parsed["category_names"][0])
+        article_data["category_id"] = category.id
+
+    article = upsert_article(db, article_data)
+
+    if parsed.get("tag_names"):
+        for tag_name in parsed["tag_names"]:
+            tag = get_or_create_tag(db, tag_name)
+            if tag not in article.tags:
+                article.tags.append(tag)
+
+    if r2 is not None:
+        article.raw_html_r2_key = r2.put_raw_html(article.id, parsed["raw_html"])
+        image_keys: list[str] = []
+        for idx, img_url in enumerate(parsed.get("image_urls", [])):
+            try:
+                fetched = fetch_image(img_url)
+            except ImageTooLarge:
+                logger.warning("image too large, skipping: %s", img_url)
+                continue
+            if fetched is None:
+                continue
+            image_keys.append(
+                r2.put_image(article.id, idx, fetched.content, fetched.content_type)
+            )
+        article.image_r2_keys = image_keys
+        db.flush()
+
+    return 1
+
+
+def crawl_target(
+    db: Session,
+    target: CrawlTarget,
+    rate_limiter: TokenBucketRateLimiter,
+    r2: R2Storage | None = None,
+) -> dict:
     """Crawl a single target using BFS link traversal. Returns crawl stats."""
     max_depth = target.max_depth if target.max_depth is not None else 2
     articles_count = 0
@@ -116,39 +180,7 @@ def crawl_target(db: Session, target: CrawlTarget, rate_limiter: TokenBucketRate
                     db.commit()
                     continue
 
-                saved = 0
-                if parsed["title"]:
-                    article_data = {
-                        "title": parsed["title"],
-                        "body_html": parsed["body_html"],
-                        "body_text": parsed["body_text"],
-                        "raw_html": parsed["raw_html"],
-                        "excerpt": parsed["excerpt"],
-                        "source_url": parsed["source_url"],
-                        "published_at": parsed["published_at"],
-                        "featured_image_url": parsed["featured_image_url"],
-                        "word_count": parsed["word_count"],
-                        "crawled_at": datetime.now(timezone.utc),
-                        "status": "draft",
-                    }
-
-                    if parsed.get("author_name"):
-                        author = get_or_create_author(db, parsed["author_name"])
-                        article_data["author_id"] = author.id
-
-                    if parsed.get("category_names"):
-                        category = get_or_create_category(db, parsed["category_names"][0])
-                        article_data["category_id"] = category.id
-
-                    article = upsert_article(db, article_data)
-
-                    if parsed.get("tag_names"):
-                        for tag_name in parsed["tag_names"]:
-                            tag = get_or_create_tag(db, tag_name)
-                            if tag not in article.tags:
-                                article.tags.append(tag)
-
-                    saved = 1
+                saved = _persist_article(db, parsed, r2)
 
                 update_crawl_job(
                     db, job,
@@ -186,8 +218,14 @@ def crawl_target(db: Session, target: CrawlTarget, rate_limiter: TokenBucketRate
 
 def crawl_all(db: Session) -> dict:
     """Crawl all active targets. Returns summary stats."""
+    from src.config.settings import settings
+    from src.storage.r2 import build_r2_storage_from_settings
+
     targets = list_crawl_targets(db)
     rate_limiter = TokenBucketRateLimiter(rate=1.0, capacity=5)
+    r2 = build_r2_storage_from_settings(settings)
+    if r2 is None:
+        logger.info("R2 storage not configured — raw_html stays in DB column")
 
     total_articles = 0
     total_pages = 0
@@ -201,7 +239,7 @@ def crawl_all(db: Session) -> dict:
             target.keywords or "(none)",
         )
         try:
-            stats = crawl_target(db, target, rate_limiter)
+            stats = crawl_target(db, target, rate_limiter, r2=r2)
             total_articles += stats["articles"]
             total_pages += stats["pages_crawled"]
             logger.info(
