@@ -1,13 +1,17 @@
 import logging
+import uuid
 
 import typer
+from sqlalchemy import select
 
 from src.config.settings import settings
 from src.db.engine import get_session
-from src.db.models import Base
+from src.db.models import Base, CrawlTarget
 from src.db.engine import engine
 from src.db.repository import add_crawl_target, list_crawl_targets
-from src.scheduler.job_manager import crawl_all
+from src.scheduler.job_manager import crawl_all, crawl_target as run_crawl_target
+from src.scheduler.rate_limiter import TokenBucketRateLimiter
+from src.storage.r2 import build_r2_storage_from_settings
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
@@ -80,6 +84,33 @@ def crawl():
             f"Done. Targets: {result['targets_crawled']}, "
             f"Articles: {result['articles_found']}, "
             f"Failed: {result['failed']}"
+        )
+
+
+@app.command("crawl-target")
+def crawl_one(target_id: str):
+    """Crawl a single target by UUID. Used by workflow_dispatch from the UI."""
+    try:
+        tid = uuid.UUID(target_id)
+    except ValueError:
+        typer.echo(f"Invalid UUID: {target_id}", err=True)
+        raise typer.Exit(code=2)
+
+    rate_limiter = TokenBucketRateLimiter(rate=1.0, capacity=5)
+    r2 = build_r2_storage_from_settings(settings)
+
+    with get_session() as db:
+        target = db.scalar(select(CrawlTarget).where(CrawlTarget.id == tid))
+        if target is None:
+            typer.echo(f"Target not found: {tid}", err=True)
+            raise typer.Exit(code=1)
+        if not target.is_active:
+            typer.echo(f"Target is inactive: {tid}", err=True)
+            raise typer.Exit(code=1)
+        stats = run_crawl_target(db, target, rate_limiter, r2=r2)
+        typer.echo(
+            f"Done. Pages: {stats['pages_crawled']}, "
+            f"Articles: {stats['articles']}"
         )
 
 
