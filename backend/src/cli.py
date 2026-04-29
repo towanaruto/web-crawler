@@ -6,8 +6,7 @@ from sqlalchemy import select
 
 from src.config.settings import settings
 from src.db.engine import get_session
-from src.db.models import Base, CrawlTarget
-from src.db.engine import engine
+from src.db.models import CrawlTarget
 from src.db.repository import add_crawl_target, list_crawl_targets
 from src.scheduler.job_manager import crawl_all, crawl_target as run_crawl_target
 from src.scheduler.rate_limiter import TokenBucketRateLimiter
@@ -16,19 +15,6 @@ from src.storage.r2 import build_r2_storage_from_settings
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 app = typer.Typer(help="Web Crawler CLI")
-
-
-@app.command()
-def init_db():
-    """Create all database tables."""
-    if settings.DATABASE_URL:
-        typer.echo(
-            "DATABASE_URL is set — schema is managed by Alembic.\n"
-            "Run: alembic upgrade head"
-        )
-        raise typer.Exit(code=1)
-    Base.metadata.create_all(engine)
-    typer.echo("Database tables created.")
 
 
 @app.command()

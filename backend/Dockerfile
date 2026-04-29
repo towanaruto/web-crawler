@@ -24,4 +24,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY . .
 
-CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# This image is no longer a long-running HTTP server. Production runs the
+# crawler as a one-shot job from GitHub Actions; the container exists only
+# to provide a consistent dev shell with all deps pre-installed. Keep it
+# alive so `docker compose exec backend python -m src.cli ...` works.
+CMD ["tail", "-f", "/dev/null"]

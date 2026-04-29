@@ -16,6 +16,10 @@ services:
       timeout: 5s
       retries: 5
 
+  # Local-only dev shell. The backend is no longer a long-running HTTP server
+  # in production — the crawler runs as a one-shot job from GitHub Actions.
+  # This service exists so developers can run `docker compose exec backend
+  # python -m src.cli crawl-target <UUID>` against the local Postgres profile.
   backend:
     build: ./backend
     depends_on:
@@ -24,19 +28,21 @@ services:
         required: false
     env_file:
       - .env
-    ports:
-      - "8000:8000"
     volumes:
       - ./backend:/app
 
+  # In production, frontend runs on Vercel against Neon. This service is for
+  # iterating on the Next.js app locally with hot reload.
   frontend:
     build: ./frontend
-    depends_on:
-      - backend
-    environment:
-      NEXT_PUBLIC_API_URL: http://backend:8000
+    env_file:
+      - .env
     ports:
       - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
 
 volumes:
   pgdata:
