@@ -70,6 +70,8 @@ class Article(Base):
     body_text = Column(Text)
     body_html = Column(Text)
     raw_html = Column(Text)
+    raw_html_r2_key = Column(String(255), nullable=True)
+    image_r2_keys = Column(JSONB, default=list, nullable=False)
     excerpt = Column(String(1000))
     source_url = Column(Text, unique=True, nullable=False)
     author_id = Column(UUID(as_uuid=True), ForeignKey("authors.id"), nullable=True)
