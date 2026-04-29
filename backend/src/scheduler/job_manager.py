@@ -48,7 +48,6 @@ def _persist_article(db: Session, parsed: dict, r2: R2Storage | None) -> int:
         "title": parsed["title"],
         "body_html": parsed["body_html"],
         "body_text": parsed["body_text"],
-        "raw_html": parsed["raw_html"] if r2 is None else None,
         "excerpt": parsed["excerpt"],
         "source_url": parsed["source_url"],
         "published_at": parsed["published_at"],
@@ -225,7 +224,7 @@ def crawl_all(db: Session) -> dict:
     rate_limiter = TokenBucketRateLimiter(rate=1.0, capacity=5)
     r2 = build_r2_storage_from_settings(settings)
     if r2 is None:
-        logger.info("R2 storage not configured — raw_html stays in DB column")
+        logger.info("R2 storage not configured — raw_html will be discarded")
 
     total_articles = 0
     total_pages = 0

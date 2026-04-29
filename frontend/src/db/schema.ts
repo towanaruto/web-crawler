@@ -45,7 +45,6 @@ export const articles = pgTable("articles", {
   slug: varchar("slug", { length: 512 }).notNull().unique(),
   bodyText: text("body_text"),
   bodyHtml: text("body_html"),
-  rawHtml: text("raw_html"),
   rawHtmlR2Key: varchar("raw_html_r2_key", { length: 255 }),
   imageR2Keys: jsonb("image_r2_keys").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
   excerpt: varchar("excerpt", { length: 1000 }),

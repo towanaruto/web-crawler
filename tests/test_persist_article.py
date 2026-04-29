@@ -30,14 +30,14 @@ def _parsed(**overrides) -> dict:
 
 
 class TestWithoutR2:
-    def test_persists_with_raw_html_in_db_column(self, db_session):
+    def test_persists_without_raw_html_storage(self, db_session):
+        # Without R2 the raw HTML is discarded — the article is still saved.
         result = _persist_article(db_session, _parsed(), r2=None)
         db_session.commit()
 
         assert result == 1
         from src.db.models import Article
         a = db_session.query(Article).one()
-        assert a.raw_html == "<html>hi</html>"
         assert a.raw_html_r2_key is None
         assert a.image_r2_keys == []
 
@@ -57,8 +57,6 @@ class TestWithR2:
         assert result == 1
         from src.db.models import Article
         a = db_session.query(Article).one()
-        # raw_html column stays empty when R2 is in use.
-        assert a.raw_html is None
         assert a.raw_html_r2_key == "articles/xx/raw.html"
         r2.put_raw_html.assert_called_once_with(a.id, "<html>hi</html>")
 

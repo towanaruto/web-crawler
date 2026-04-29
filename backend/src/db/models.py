@@ -69,7 +69,6 @@ class Article(Base):
     slug = Column(String(512), unique=True, nullable=False)
     body_text = Column(Text)
     body_html = Column(Text)
-    raw_html = Column(Text)
     raw_html_r2_key = Column(String(255), nullable=True)
     image_r2_keys = Column(JSONB, default=list, nullable=False)
     excerpt = Column(String(1000))
