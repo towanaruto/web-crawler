@@ -1,0 +1,49 @@
+name: migrate
+
+# Manual trigger only. Auto-running migrations on push is dangerous —
+# schema changes deserve a deliberate human gate.
+on:
+  workflow_dispatch:
+    inputs:
+      target_revision:
+        description: "Alembic revision (default: head)"
+        required: false
+        type: string
+        default: head
+
+concurrency:
+  group: migrate
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install Python deps
+        run: pip install -r requirements.txt
+
+      - name: Show pending migrations
+        env:
+          MIGRATION_DATABASE_URL: ${{ secrets.MIGRATION_DATABASE_URL }}
+          DB_REQUIRE_SSL: "true"
+          PYTHONPATH: ${{ github.workspace }}/backend
+        run: alembic current && alembic heads
+
+      - name: Apply migrations
+        env:
+          MIGRATION_DATABASE_URL: ${{ secrets.MIGRATION_DATABASE_URL }}
+          DB_REQUIRE_SSL: "true"
+          PYTHONPATH: ${{ github.workspace }}/backend
+        run: alembic upgrade ${{ inputs.target_revision }}
