@@ -13,5 +13,6 @@ typer==0.15.1
 python-slugify==8.0.4
 httpx==0.28.1
 apscheduler~=3.10
+boto3==1.35.84
 pytest==8.3.4
 pytest-asyncio==0.24.0

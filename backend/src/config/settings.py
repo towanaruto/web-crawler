@@ -14,6 +14,12 @@ class Settings(BaseSettings):
     DB_REQUIRE_SSL: bool = False
     MIGRATION_DATABASE_URL: Optional[str] = None
 
+    R2_ACCOUNT_ID: Optional[str] = None
+    R2_ACCESS_KEY_ID: Optional[str] = None
+    R2_SECRET_ACCESS_KEY: Optional[str] = None
+    R2_BUCKET: Optional[str] = None
+    R2_PUBLIC_URL: Optional[str] = None
+
     @property
     def database_url(self) -> str:
         if self.DATABASE_URL:
