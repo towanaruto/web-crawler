@@ -1,7 +1,7 @@
 """Add keywords, keyword_mode, schedule to crawl_targets
 
 Revision ID: 001_keyword_schedule
-Revises:
+Revises: 000_initial_schema
 Create Date: 2026-02-27
 """
 from alembic import op
@@ -9,7 +9,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
 
 revision = "001_keyword_schedule"
-down_revision = None
+down_revision = "000_initial_schema"
 branch_labels = None
 depends_on = None
 
