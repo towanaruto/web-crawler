@@ -10,6 +10,7 @@ from sqlalchemy import (
     String,
     Text,
     Boolean,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, relationship
@@ -22,7 +23,12 @@ class Base(DeclarativeBase):
 class Author(Base):
     __tablename__ = "authors"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"),
+    )
     name = Column(String(256), nullable=False)
     slug = Column(String(256), unique=True, nullable=False)
     source_url = Column(Text)
@@ -34,7 +40,12 @@ class Author(Base):
 class Category(Base):
     __tablename__ = "categories"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"),
+    )
     name = Column(String(256), nullable=False)
     slug = Column(String(256), unique=True, nullable=False)
     parent_id = Column(UUID(as_uuid=True), ForeignKey("categories.id"), nullable=True)
@@ -45,7 +56,12 @@ class Category(Base):
 class Tag(Base):
     __tablename__ = "tags"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"),
+    )
     name = Column(String(128), nullable=False)
     slug = Column(String(128), unique=True, nullable=False)
 
@@ -64,7 +80,12 @@ class ArticleTag(Base):
 class Article(Base):
     __tablename__ = "articles"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"),
+    )
     title = Column(String(512), nullable=False)
     slug = Column(String(512), unique=True, nullable=False)
     body_text = Column(Text)
@@ -97,7 +118,12 @@ class Article(Base):
 class CrawlTarget(Base):
     __tablename__ = "crawl_targets"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"),
+    )
     base_url = Column(Text, unique=True, nullable=False)
     crawl_mode = Column(String(20), nullable=False, default="static")
     selector_config = Column(JSONB, default=dict)
@@ -113,7 +139,12 @@ class CrawlTarget(Base):
 class CrawlJob(Base):
     __tablename__ = "crawl_jobs"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"),
+    )
     target_id = Column(
         UUID(as_uuid=True), ForeignKey("crawl_targets.id"), nullable=False
     )

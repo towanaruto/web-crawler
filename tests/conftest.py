@@ -16,6 +16,20 @@ def _remap_jsonb_for_sqlite(target, connection, **kw):
                     col.type = JSON()
 
 
+@event.listens_for(Base.metadata, "before_create")
+def _strip_pg_only_defaults_for_sqlite(target, connection, **kw):
+    """SQLite has no gen_random_uuid(); SQLAlchemy still emits the server
+    default in CREATE TABLE. Drop the server_default for tests so DDL parses,
+    and rely on the Python-side default=uuid.uuid4 instead."""
+    if connection.dialect.name == "sqlite":
+        for table in target.tables.values():
+            for col in table.columns:
+                if col.server_default is not None:
+                    sd_text = getattr(col.server_default, "arg", None)
+                    if sd_text is not None and "gen_random_uuid" in str(sd_text):
+                        col.server_default = None
+
+
 @pytest.fixture
 def db_session():
     """Create an in-memory SQLite session for testing."""
