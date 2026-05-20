@@ -12,6 +12,7 @@ export default function CrawlTargetList({
 }) {
   const router = useRouter();
   const [crawling, setCrawling] = useState<string | null>(null);
+  const [queuedJobByTarget, setQueuedJobByTarget] = useState<Record<string, string>>({});
 
   async function handleDeactivate(id: string) {
     try {
@@ -25,9 +26,13 @@ export default function CrawlTargetList({
   async function handleCrawlOne(id: string) {
     setCrawling(id);
     try {
-      await crawlAction(id);
+      const result = await crawlAction(id);
+      const jobId = result.jobIds[0];
+      if (jobId) {
+        setQueuedJobByTarget((current) => ({ ...current, [id]: jobId }));
+      }
     } catch {
-      alert("Failed to dispatch crawl");
+      alert("Failed to start crawl");
     } finally {
       setCrawling(null);
     }
@@ -73,6 +78,11 @@ export default function CrawlTargetList({
           <div style={styles.meta}>
             <span style={styles.badge}>{t.crawlMode}</span>
             <span style={styles.detail}>Depth: {t.maxDepth}</span>
+            {queuedJobByTarget[t.id] && (
+              <span style={styles.detail}>
+                Job: {queuedJobByTarget[t.id].slice(0, 8)}
+              </span>
+            )}
             {t.keywords.length > 0 && (
               <span style={styles.detail}>
                 Keywords ({t.keywordMode}): {t.keywords.join(", ")}
