@@ -11,4 +11,7 @@ typer==0.15.1
 click==8.1.8
 python-slugify==8.0.4
 boto3==1.35.84
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+httpx==0.28.1
 pytest==8.3.4
