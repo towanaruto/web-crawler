@@ -16,10 +16,8 @@ services:
       timeout: 5s
       retries: 5
 
-  # Local-only dev shell. The backend is no longer a long-running HTTP server
-  # in production — the crawler runs as a one-shot job from GitHub Actions.
-  # This service exists so developers can run `docker compose exec backend
-  # python -m src.cli crawl-target <UUID>` against the local Postgres profile.
+  # Local backend API. The CLI remains available via
+  # `docker compose exec backend python -m src.cli ...`.
   backend:
     build: ./backend
     depends_on:
@@ -28,6 +26,8 @@ services:
         required: false
     env_file:
       - .env
+    ports:
+      - "8000:8000"
     volumes:
       - ./backend:/app
 
