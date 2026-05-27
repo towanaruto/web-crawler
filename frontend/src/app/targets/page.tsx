@@ -2,11 +2,13 @@ import AddTargetForm from "@/components/AddTargetForm";
 import CrawlButton from "@/components/CrawlButton";
 import CrawlTargetList from "@/components/CrawlTargetList";
 import { listActiveCrawlTargets, type CrawlTargetItem } from "@/db/queries";
+import { requireCurrentUser } from "@/lib/current-user";
 
 export default async function TargetsPage() {
+  const user = await requireCurrentUser();
   let targets: CrawlTargetItem[] = [];
   try {
-    targets = await listActiveCrawlTargets();
+    targets = await listActiveCrawlTargets(user.id);
   } catch {
     // empty list rendered below
   }

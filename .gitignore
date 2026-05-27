@@ -10,11 +10,13 @@ dist/
 build/
 .venv/
 venv/
+uv.lock
 
 # Node
 node_modules/
 .next/
 out/
+*.tsbuildinfo
 
 # Docker
 pgdata/

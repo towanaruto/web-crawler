@@ -13,78 +13,78 @@ from src.db.repository import (
 
 
 class TestRepository:
-    def test_upsert_article_insert(self, db_session):
+    def test_upsert_article_insert(self, db_session, auth_user):
         data = {
             "title": "Test Article",
             "slug": "test-article",
             "source_url": "https://example.com/test",
             "body_text": "Test body",
         }
-        article = upsert_article(db_session, data)
+        article = upsert_article(db_session, data, user_id=auth_user.id)
         db_session.commit()
 
         assert article.title == "Test Article"
         assert article.slug == "test-article"
 
-    def test_upsert_article_update(self, db_session):
+    def test_upsert_article_update(self, db_session, auth_user):
         data = {
             "title": "Original",
             "slug": "original",
             "source_url": "https://example.com/original",
         }
-        upsert_article(db_session, data)
+        upsert_article(db_session, data, user_id=auth_user.id)
         db_session.commit()
 
         updated = upsert_article(db_session, {
             "title": "Updated",
             "source_url": "https://example.com/original",
-        })
+        }, user_id=auth_user.id)
         db_session.commit()
 
         assert updated.title == "Updated"
 
-    def test_upsert_article_slug_uniqueness(self, db_session):
+    def test_upsert_article_slug_uniqueness(self, db_session, auth_user):
         upsert_article(db_session, {
             "title": "Same Title",
             "slug": "same-title",
             "source_url": "https://example.com/1",
-        })
+        }, user_id=auth_user.id)
         db_session.commit()
 
         article2 = upsert_article(db_session, {
             "title": "Same Title",
             "slug": "same-title",
             "source_url": "https://example.com/2",
-        })
+        }, user_id=auth_user.id)
         db_session.commit()
 
         assert article2.slug == "same-title-1"
 
-    def test_get_article_by_slug(self, db_session):
+    def test_get_article_by_slug(self, db_session, auth_user):
         upsert_article(db_session, {
             "title": "Find Me",
             "slug": "find-me",
             "source_url": "https://example.com/find",
-        })
+        }, user_id=auth_user.id)
         db_session.commit()
 
-        found = get_article_by_slug(db_session, "find-me")
+        found = get_article_by_slug(db_session, "find-me", user_id=auth_user.id)
         assert found is not None
         assert found.title == "Find Me"
 
-        not_found = get_article_by_slug(db_session, "nope")
+        not_found = get_article_by_slug(db_session, "nope", user_id=auth_user.id)
         assert not_found is None
 
-    def test_list_articles(self, db_session):
+    def test_list_articles(self, db_session, auth_user):
         for i in range(5):
             upsert_article(db_session, {
                 "title": f"Article {i}",
                 "slug": f"article-{i}",
                 "source_url": f"https://example.com/{i}",
-            })
+            }, user_id=auth_user.id)
         db_session.commit()
 
-        articles, total = list_articles(db_session, limit=3)
+        articles, total = list_articles(db_session, user_id=auth_user.id, limit=3)
         assert len(articles) == 3
         assert total == 5
 

@@ -1,13 +1,17 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import { db } from "@/db/client";
 import { articles } from "@/db/schema";
+import { requireCurrentUser } from "@/lib/current-user";
 
 export async function deleteArticleAction(id: string) {
-  await db.delete(articles).where(eq(articles.id, id));
+  const user = await requireCurrentUser();
+  await db
+    .delete(articles)
+    .where(and(eq(articles.id, id), eq(articles.userId, user.id)));
   revalidatePath("/");
 }
 
@@ -25,15 +29,28 @@ type BackendCrawlSummary = {
 };
 
 export async function triggerCrawl(targetId?: string): Promise<CrawlRequestResult> {
+  const user = await requireCurrentUser();
   const backendApiUrl = process.env.BACKEND_API_URL;
   if (!backendApiUrl) {
     throw new Error("BACKEND_API_URL is not set");
   }
 
   const endpoint = targetId ? `/crawl/${targetId}` : "/crawl";
-  const res = await fetch(new URL(endpoint, backendApiUrl), {
+  const url = new URL(endpoint, backendApiUrl);
+  if (targetId) {
+    url.searchParams.set("user_id", user.id);
+  }
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+    "Content-Type": "application/json",
+  };
+  if (process.env.BACKEND_API_TOKEN) {
+    headers["X-Internal-Api-Key"] = process.env.BACKEND_API_TOKEN;
+  }
+  const res = await fetch(url, {
     method: "POST",
-    headers: { Accept: "application/json" },
+    headers,
+    body: targetId ? undefined : JSON.stringify({ user_id: user.id }),
     cache: "no-store",
   });
 

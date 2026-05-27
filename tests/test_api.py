@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -7,8 +8,10 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from src.api.app import app
+from src.auth.invites import create_invite
+from src.config.settings import settings
 from src.db.engine import get_db
-from src.db.models import Base, CrawlJob, CrawlTarget
+from src.db.models import Base, CrawlJob, CrawlTarget, User
 
 
 @pytest.fixture
@@ -32,6 +35,13 @@ def _override_db(session):
     return _get_db
 
 
+def _user(session, email="user@example.com"):
+    user = User(auth0_sub=f"auth0|{email}", email=email)
+    session.add(user)
+    session.flush()
+    return user
+
+
 def test_health():
     client = TestClient(app)
 
@@ -42,11 +52,12 @@ def test_health():
 
 
 def test_target_crawl_returns_404_for_missing_target(api_db_session):
+    user = _user(api_db_session)
     app.dependency_overrides[get_db] = _override_db(api_db_session)
     client = TestClient(app)
 
     try:
-        response = client.post(f"/crawl/{uuid.uuid4()}")
+        response = client.post(f"/crawl/{uuid.uuid4()}?user_id={user.id}")
     finally:
         app.dependency_overrides.clear()
 
@@ -55,10 +66,19 @@ def test_target_crawl_returns_404_for_missing_target(api_db_session):
 
 
 def test_list_crawl_jobs(api_db_session):
-    target = CrawlTarget(base_url="https://example.com", crawl_mode="static")
+    user = _user(api_db_session)
+    target = CrawlTarget(
+        user_id=user.id,
+        base_url="https://example.com",
+        crawl_mode="static",
+    )
     api_db_session.add(target)
     api_db_session.flush()
-    job = CrawlJob(target_id=target.id, target_url="https://example.com/page")
+    job = CrawlJob(
+        user_id=user.id,
+        target_id=target.id,
+        target_url="https://example.com/page",
+    )
     api_db_session.add(job)
     api_db_session.flush()
 
@@ -66,7 +86,7 @@ def test_list_crawl_jobs(api_db_session):
     client = TestClient(app)
 
     try:
-        response = client.get("/crawl-jobs")
+        response = client.get(f"/crawl-jobs?user_id={user.id}")
     finally:
         app.dependency_overrides.clear()
 
@@ -74,3 +94,81 @@ def test_list_crawl_jobs(api_db_session):
     assert response.json()[0]["id"] == str(job.id)
     assert response.json()[0]["target_url"] == "https://example.com/page"
     assert response.json()[0]["status"] == "pending"
+
+
+def test_crawl_rejects_missing_internal_api_key(api_db_session, monkeypatch):
+    user = _user(api_db_session)
+    monkeypatch.setattr(settings, "BACKEND_API_TOKEN", "secret")
+    app.dependency_overrides[get_db] = _override_db(api_db_session)
+    client = TestClient(app)
+
+    try:
+        response = client.post("/crawl", json={"user_id": str(user.id)})
+    finally:
+        app.dependency_overrides.clear()
+        monkeypatch.setattr(settings, "BACKEND_API_TOKEN", None)
+
+    assert response.status_code == 401
+
+
+def test_target_crawl_cannot_use_another_users_target(api_db_session):
+    owner = _user(api_db_session, "owner@example.com")
+    other = _user(api_db_session, "other@example.com")
+    target = CrawlTarget(
+        user_id=owner.id,
+        base_url="https://example.com",
+        crawl_mode="static",
+    )
+    api_db_session.add(target)
+    api_db_session.flush()
+
+    app.dependency_overrides[get_db] = _override_db(api_db_session)
+    client = TestClient(app)
+
+    try:
+        response = client.post(f"/crawl/{target.id}?user_id={other.id}")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 404
+
+
+def test_invite_verify_endpoint_accepts_valid_code(api_db_session):
+    _, code = create_invite(
+        api_db_session,
+        email="user@example.com",
+        expires_at=datetime.now(timezone.utc) + timedelta(days=1),
+    )
+    app.dependency_overrides[get_db] = _override_db(api_db_session)
+    client = TestClient(app)
+
+    try:
+        response = client.post(
+            "/auth/invites/verify",
+            json={"email": "user@example.com", "access_code": code},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+
+
+def test_invite_verify_endpoint_rejects_invalid_code(api_db_session):
+    create_invite(
+        api_db_session,
+        email="user@example.com",
+        expires_at=datetime.now(timezone.utc) + timedelta(days=1),
+    )
+    app.dependency_overrides[get_db] = _override_db(api_db_session)
+    client = TestClient(app)
+
+    try:
+        response = client.post(
+            "/auth/invites/verify",
+            json={"email": "user@example.com", "access_code": "wrong"},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 403

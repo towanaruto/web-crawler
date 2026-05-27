@@ -7,41 +7,35 @@ Web 上の記事を自動収集して Next.js でブログ表示するシステ�
 
 ```
             ┌────────────────────────────────────┐
-            │  GitHub Actions                    │
-            │  - crawl.yml   (cron 6h + manual)  │
-            │  - migrate.yml (manual)            │
-            │  - test.yml    (PR / push)         │
-            └────┬─────────────────┬─────────────┘
-                 │ writes          │ writes (raw_html, images)
+            │  Vercel — Next.js                  │
+            │  - Auth0 session                   │
+            │  - Drizzle → Neon                  │
+            │  - Server Actions → Render API     │
+            └────┬──────────────────────┬────────┘
+                 │ reads/writes         │ queues crawl
                  ▼                 ▼
               ┌──────┐         ┌────────────────┐
-              │ Neon │         │ Cloudflare R2  │
-              │  PG  │         │ (S3-compat)    │
-              └──┬───┘         └────────┬───────┘
-                 │ reads                │ public GET
-                 ▼                      │
-              ┌────────────────────────────────┐
-              │ Vercel — Next.js               │
-              │ - RSC: Drizzle → Neon          │
-              │ - Server Actions:              │
-              │   triggerCrawl(target?)        │
-              │   → workflow_dispatch          │
-              └────────────┬───────────────────┘
-                           ▼ Browser
+              │ Neon │◀───────│ Render FastAPI │
+              │  PG  │ writes │ crawler worker │
+              └──┬───┘        └───────┬────────┘
+                 │ reads              │ writes raw_html/images
+                 ▼                    ▼
+              Browser           Cloudflare R2
 ```
 
 | 層 | 採用 |
 |---|---|
-| Compute (crawler) | GitHub Actions(cron + workflow_dispatch) |
+| Compute (crawler/API) | Render FastAPI |
 | Database | Neon PostgreSQL(serverless、`sslmode=require`) |
 | Storage | Cloudflare R2(`raw_html` と取得画像のバイナリ) |
-| Frontend & API | Vercel 上の Next.js(Drizzle で Neon に直接アクセス) |
+| Frontend | Vercel 上の Next.js(Drizzle で Neon に直接アクセス) |
+| Auth | Auth0 + access code invite |
 
 ## ディレクトリ
 
 ```
 web_crawler/
-├── backend/                Python crawler (run on GH Actions)
+├── backend/                FastAPI + Python crawler (run on Render/local)
 │   ├── alembic/            schema migrations (source-of-truth)
 │   └── src/
 │       ├── crawler/        static / dynamic (Playwright)
@@ -56,7 +50,8 @@ web_crawler/
 │       ├── app/            pages + Server Actions
 │       ├── components/
 │       └── db/             Drizzle schema + queries
-└── .github/workflows/      crawl.yml / migrate.yml / test.yml
+├── auth0-actions/          Auth0 Action samples
+└── tests/                  pytest coverage
 ```
 
 ## クラウド初期セットアップ(Phase 0)
@@ -80,40 +75,80 @@ web_crawler/
    - → `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`
 4. Account ID(R2 ホーム画面右側)を控える → `R2_ACCOUNT_ID`
 
-### 3. GitHub PAT
+### 3. Auth0
 
-1. GitHub → Settings → Developer settings → Personal access tokens → **Fine-grained tokens** → Generate new
-2. Repository access: this repo only
-3. Permissions: `Actions: Read and write`(これだけ)
-4. Expiration: 90 days
-5. 生成された token を `GH_DISPATCH_TOKEN` として控える
+1. Auth0 で Regular Web Application を作成
+2. Callback URL に `https://<your-vercel-domain>/auth/callback` を追加
+3. Logout URL / Web Origin に `https://<your-vercel-domain>` を追加
+4. Database connection と Google social connection を有効化
+5. `auth0-actions/` の 2 つの Action を設定し、`BACKEND_API_URL` と `BACKEND_API_TOKEN` を secrets に登録
 
 ### 4. Secrets / Env vars 登録
 
-**GitHub repo Settings → Secrets and variables → Actions**:
+**Render Environment Variables**:
 | Secret | 用途 |
 |---|---|
-| `DATABASE_URL` | Neon pooled (`crawl.yml`) |
-| `MIGRATION_DATABASE_URL` | Neon direct (`migrate.yml`) |
-| `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET` / `R2_PUBLIC_URL` | R2 (`crawl.yml`) |
+| `DATABASE_URL` | Neon pooled |
+| `MIGRATION_DATABASE_URL` | Neon direct |
+| `BACKEND_API_TOKEN` | Vercel/Auth0 Actions からの内部 API 保護 |
+| `INVITE_CODE_PEPPER` | access code hash 用 |
+| `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET` / `R2_PUBLIC_URL` | R2 |
 
 **Vercel Project Settings → Environment Variables**(Production / Preview):
 | Variable | 用途 |
 |---|---|
 | `DATABASE_URL` | Neon pooled(Server Components / Server Actions) |
 | `R2_PUBLIC_URL` | `next/image` の `remotePatterns` 用 |
-| `GH_OWNER` / `GH_REPO` | GitHub `workflow_dispatch` API |
-| `GH_DISPATCH_TOKEN` | 同上 |
+| `BACKEND_API_URL` / `BACKEND_API_TOKEN` | Render API 呼び出し |
+| `AUTH0_SECRET` / `APP_BASE_URL` / `AUTH0_DOMAIN` / `AUTH0_CLIENT_ID` / `AUTH0_CLIENT_SECRET` | Auth0 SDK |
 
 > ⚠️ どれも **`NEXT_PUBLIC_` プレフィックスを付けないこと**。ブラウザに secret が漏れる。
+
+### Auth0 + Access code
+
+このアプリは Auth0 でログインし、Neon 側の `users.id` を使って
+`articles` / `crawl_targets` / `crawl_jobs` をユーザーごとに分離する。
+不特定多数の登録を避けるため、先に `/register` で email + access code を
+検証したユーザーだけ Auth0 の signup / Google 初回ログインへ進める。
+検証済み invite は 15 分以内に Auth0 側で消費される必要がある。
+
+**Vercel env**:
+| Variable | 用途 |
+|---|---|
+| `AUTH0_SECRET` | Auth0 SDK session cookie 暗号化用。`openssl rand -hex 32` 推奨 |
+| `APP_BASE_URL` | Vercel app URL。local は `http://localhost:3000` |
+| `AUTH0_DOMAIN` / `AUTH0_CLIENT_ID` / `AUTH0_CLIENT_SECRET` | Auth0 application credentials |
+| `AUTH0_AUDIENCE` / `AUTH0_SCOPE` | API access token が必要な場合に指定 |
+| `BACKEND_API_URL` | Render の FastAPI URL |
+| `BACKEND_API_TOKEN` | Vercel -> Render と Auth0 Actions -> Render の共有 secret |
+
+**Render env**:
+| Variable | 用途 |
+|---|---|
+| `DATABASE_URL` / `MIGRATION_DATABASE_URL` | Neon 接続 |
+| `BACKEND_API_TOKEN` | 内部 API token 検証 |
+| `INVITE_CODE_PEPPER` | access code hash の pepper |
+| `AUTH0_BOOTSTRAP_SUB` / `BOOTSTRAP_USER_EMAIL` | migration で既存データを割り当てる初期管理者 |
+
+Auth0 dashboard では callback/logout URL に `/auth/callback` と app origin を
+設定する。Auth0 Actions には `auth0-actions/pre-user-registration.js` と
+`auth0-actions/post-login.js` を登録し、Action secrets に
+`BACKEND_API_URL` と `BACKEND_API_TOKEN` を入れる。
+
+access code は CLI で発行する。code は一度しか表示されず、DB には hash のみ保存される。
+
+```bash
+docker compose exec backend python -m src.cli create-invite user@example.com --days 7
+```
 
 ### 5. 初回 schema 適用
 
 ```bash
-gh workflow run migrate.yml
+cd backend
+alembic upgrade head
 ```
 
-または GitHub UI: Actions タブ → migrate → Run workflow。`alembic upgrade head` が走り、Neon に articles / authors / categories / tags / article_tags / crawl_targets / crawl_jobs が出来る。
+`AUTH0_BOOTSTRAP_SUB` と `BOOTSTRAP_USER_EMAIL` を設定してから実行する。既存の articles / crawl_targets / crawl_jobs はこの初期管理者に割り当てられる。
 
 ### 6. Vercel デプロイ
 
@@ -137,18 +172,19 @@ docker compose run backend python -m src.cli add-target \
 
 ### クロール起動
 
-- **自動**: `.github/workflows/crawl.yml` の `schedule: 0 */6 * * *` で 6 時間ごと
 - **手動(全ターゲット)**: `/targets` ページの **Crawl Now** ボタン
 - **手動(個別)**: `/targets` の各行にある **Crawl this** ボタン
 
-どちらも内部的に `workflow_dispatch` で `crawl.yml` を起動する。進捗は GitHub Actions タブで確認。
+どちらも Vercel Server Action から Render の FastAPI を呼び出す。
+Render backend は `BACKEND_API_TOKEN` で保護され、ログインユーザーの
+`user_id` に紐づく target だけをクロールする。
 
 ### スキーマ変更
 
 1. `backend/alembic/versions/` に migration 追加
 2. ローカルで動作確認: `docker compose run backend alembic upgrade head`(local Postgres)
-3. PR を作成 → `test.yml` が pytest + tsc + next build を回す
-4. main にマージ後、Actions UI から `migrate.yml` を `workflow_dispatch` で実行
+3. `backend` で pytest、`frontend` で `npx tsc --noEmit` と `npm run build`
+4. Render shell または CI/CD の migration step で `alembic upgrade head` を実行
 
 ## ローカル開発
 
@@ -178,6 +214,7 @@ docker compose exec backend python -m src.cli <command>
 # list-targets               アクティブなターゲット一覧
 # crawl                      全アクティブターゲットをクロール
 # crawl-target <UUID>        特定ターゲット 1 件をクロール
+# create-invite <email>      access code invite を作成
 ```
 
 ## 既存データを R2 に移行する(初回のみ)

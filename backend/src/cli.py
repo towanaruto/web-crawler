@@ -1,12 +1,14 @@
 import logging
 import uuid
+from datetime import datetime, timedelta, timezone
 
 import typer
 from sqlalchemy import select
 
 from src.config.settings import settings
 from src.db.engine import get_session
-from src.db.models import CrawlTarget
+from src.auth.invites import create_invite, normalize_email
+from src.db.models import CrawlTarget, User
 from src.db.repository import add_crawl_target, list_crawl_targets
 from src.scheduler.job_manager import crawl_all, crawl_target as run_crawl_target
 from src.scheduler.rate_limiter import TokenBucketRateLimiter
@@ -20,6 +22,7 @@ app = typer.Typer(help="Web Crawler CLI")
 @app.command()
 def add_target(
     url: str,
+    user_id: str = typer.Option("", help="Owner user UUID. Defaults to bootstrap user."),
     mode: str = typer.Option("static", help="Crawl mode: static or dynamic"),
     max_depth: int = typer.Option(2, help="Max crawl depth"),
     keywords: str = typer.Option("", help="Comma-separated keywords for filtering"),
@@ -29,8 +32,9 @@ def add_target(
     """Add a crawl target URL."""
     kw_list = [k.strip() for k in keywords.split(",") if k.strip()] if keywords else []
     with get_session() as db:
+        owner_id = _resolve_cli_user_id(db, user_id)
         target = add_crawl_target(
-            db, url,
+            db, owner_id, url,
             crawl_mode=mode,
             max_depth=max_depth,
             keywords=kw_list,
@@ -98,6 +102,47 @@ def crawl_one(target_id: str):
             f"Done. Pages: {stats['pages_crawled']}, "
             f"Articles: {stats['articles']}"
         )
+
+
+@app.command("create-invite")
+def create_invite_command(
+    email: str,
+    days: int = typer.Option(7, min=1, help="Invite expiration in days"),
+):
+    """Create an access code invite. The code is printed once and never stored."""
+    expires_at = datetime.now(timezone.utc) + timedelta(days=days)
+    with get_session() as db:
+        invite, code = create_invite(db, email=email, expires_at=expires_at)
+        typer.echo(f"Invite: {invite.id}")
+        typer.echo(f"Email: {invite.email}")
+        typer.echo(f"Access code: {code}")
+        typer.echo(f"Expires: {invite.expires_at.isoformat()}")
+
+
+def _resolve_cli_user_id(db, user_id: str) -> uuid.UUID:
+    if user_id:
+        return uuid.UUID(user_id)
+
+    if settings.AUTH0_BOOTSTRAP_SUB:
+        user = db.scalar(
+            select(User).where(User.auth0_sub == settings.AUTH0_BOOTSTRAP_SUB)
+        )
+        if user:
+            return user.id
+
+    if settings.BOOTSTRAP_USER_EMAIL:
+        user = db.scalar(
+            select(User).where(
+                User.email == normalize_email(settings.BOOTSTRAP_USER_EMAIL)
+            )
+        )
+        if user:
+            return user.id
+
+    raise typer.BadParameter(
+        "user_id is required unless AUTH0_BOOTSTRAP_SUB or BOOTSTRAP_USER_EMAIL "
+        "matches an existing user"
+    )
 
 
 if __name__ == "__main__":

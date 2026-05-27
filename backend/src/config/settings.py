@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     R2_BUCKET: Optional[str] = None
     R2_PUBLIC_URL: Optional[str] = None
 
+    BACKEND_API_TOKEN: Optional[str] = None
+    INVITE_CODE_PEPPER: Optional[str] = None
+    AUTH0_BOOTSTRAP_SUB: Optional[str] = None
+    BOOTSTRAP_USER_EMAIL: Optional[str] = None
+
     @property
     def database_url(self) -> str:
         if self.DATABASE_URL:

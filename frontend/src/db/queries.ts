@@ -2,7 +2,7 @@
  * Page-facing read queries. Wraps Drizzle to return shapes the React tree
  * consumes directly — no further mapping in components.
  */
-import { desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 
 import { db } from "./client";
 import { articles, crawlTargets } from "./schema";
@@ -42,19 +42,23 @@ export type CrawlTargetItem = {
 };
 
 export async function listArticles(opts: {
+  userId: string;
   search?: string;
   offset?: number;
   limit?: number;
 }): Promise<{ items: ArticleListItem[]; total: number }> {
-  const { search, offset = 0, limit = 20 } = opts;
+  const { userId, search, offset = 0, limit = 20 } = opts;
 
-  const where = search
+  const searchWhere = search
     ? or(
         ilike(articles.title, `%${search}%`),
         ilike(articles.bodyText, `%${search}%`),
         ilike(articles.excerpt, `%${search}%`),
       )
     : undefined;
+  const where = searchWhere
+    ? and(eq(articles.userId, userId), searchWhere)
+    : eq(articles.userId, userId);
 
   const totalRow = await db
     .select({ count: sql<number>`count(*)::int` })
@@ -77,9 +81,12 @@ export async function listArticles(opts: {
   return { items: rows.map(toListItem), total };
 }
 
-export async function getArticleBySlug(slug: string): Promise<ArticleDetail | null> {
+export async function getArticleBySlug(
+  slug: string,
+  userId: string,
+): Promise<ArticleDetail | null> {
   const row = await db.query.articles.findFirst({
-    where: eq(articles.slug, slug),
+    where: and(eq(articles.slug, slug), eq(articles.userId, userId)),
     with: {
       author: true,
       category: true,
@@ -96,11 +103,11 @@ export async function getArticleBySlug(slug: string): Promise<ArticleDetail | nu
   };
 }
 
-export async function listActiveCrawlTargets(): Promise<CrawlTargetItem[]> {
+export async function listActiveCrawlTargets(userId: string): Promise<CrawlTargetItem[]> {
   const rows = await db
     .select()
     .from(crawlTargets)
-    .where(eq(crawlTargets.isActive, true));
+    .where(and(eq(crawlTargets.isActive, true), eq(crawlTargets.userId, userId)));
   return rows.map((t) => ({
     id: t.id,
     baseUrl: t.baseUrl,
