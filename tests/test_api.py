@@ -7,7 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from src.api.app import app
+from src.api import app as api_app
 from src.auth.invites import create_invite
 from src.config.settings import settings
 from src.db.engine import get_db
@@ -68,6 +68,7 @@ def test_target_crawl_returns_404_for_missing_target(api_db_session):
 
 
 def test_target_crawl_queues_job(api_db_session, monkeypatch):
+    user = _user(api_db_session)
     queued_job_ids = []
 
     def fake_run_queued_target_crawl(job_id):
@@ -75,7 +76,11 @@ def test_target_crawl_queues_job(api_db_session, monkeypatch):
 
     monkeypatch.setattr(api_app, "run_queued_target_crawl", fake_run_queued_target_crawl)
 
-    target = CrawlTarget(base_url="https://example.com", crawl_mode="static")
+    target = CrawlTarget(
+        user_id=user.id,
+        base_url="https://example.com",
+        crawl_mode="static",
+    )
     api_db_session.add(target)
     api_db_session.flush()
 
@@ -83,7 +88,7 @@ def test_target_crawl_queues_job(api_db_session, monkeypatch):
     client = TestClient(app)
 
     try:
-        response = client.post(f"/crawl/{target.id}")
+        response = client.post(f"/crawl/{target.id}?user_id={user.id}")
     finally:
         app.dependency_overrides.clear()
 
@@ -96,6 +101,7 @@ def test_target_crawl_queues_job(api_db_session, monkeypatch):
 
 
 def test_crawl_queues_all_active_targets(api_db_session, monkeypatch):
+    user = _user(api_db_session)
     queued_job_ids = []
 
     def fake_run_queued_target_crawl(job_id):
@@ -103,8 +109,13 @@ def test_crawl_queues_all_active_targets(api_db_session, monkeypatch):
 
     monkeypatch.setattr(api_app, "run_queued_target_crawl", fake_run_queued_target_crawl)
 
-    active_target = CrawlTarget(base_url="https://example.com", crawl_mode="static")
+    active_target = CrawlTarget(
+        user_id=user.id,
+        base_url="https://example.com",
+        crawl_mode="static",
+    )
     inactive_target = CrawlTarget(
+        user_id=user.id,
         base_url="https://inactive.example.com",
         crawl_mode="static",
         is_active=False,
@@ -116,7 +127,7 @@ def test_crawl_queues_all_active_targets(api_db_session, monkeypatch):
     client = TestClient(app)
 
     try:
-        response = client.post("/crawl")
+        response = client.post("/crawl", json={"user_id": str(user.id)})
     finally:
         app.dependency_overrides.clear()
 

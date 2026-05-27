@@ -45,6 +45,9 @@ class CrawlJobResponse(BaseModel):
     finished_at: datetime | None
 
 
+CrawlTargetResponse = CrawlJobResponse
+
+
 class UserScopedRequest(BaseModel):
     user_id: uuid.UUID
 
@@ -83,17 +86,29 @@ def health() -> HealthResponse:
     return HealthResponse(status="ok")
 
 
-@app.post("/crawl", response_model=CrawlSummaryResponse)
+@app.post(
+    "/crawl",
+    response_model=list[CrawlJobResponse],
+    status_code=status.HTTP_202_ACCEPTED,
+)
 def start_crawl(
+    background_tasks: BackgroundTasks,
     body: UserScopedRequest,
     db: Session = Depends(get_db),
     _: None = Depends(require_internal_api_key),
-) -> dict:
-    return crawl_all(db, user_id=body.user_id)
+) -> list[CrawlJob]:
+    jobs = create_all_target_crawl_jobs(db, user_id=body.user_id)
+    db.commit()
+    for job in jobs:
+        background_tasks.add_task(run_queued_target_crawl, job.id)
+    return jobs
 
 
-@app.post("/crawl/{target_id}", response_model=CrawlTargetResponse)
-
+@app.post(
+    "/crawl/{target_id}",
+    response_model=CrawlTargetResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
 def start_target_crawl(
     target_id: uuid.UUID,
     background_tasks: BackgroundTasks,

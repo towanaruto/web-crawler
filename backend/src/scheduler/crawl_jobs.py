@@ -26,11 +26,14 @@ logger = logging.getLogger(__name__)
 
 
 def create_target_crawl_job(db: Session, target: CrawlTarget) -> CrawlJob:
-    return create_crawl_job(db, target.id, target.base_url)
+    return create_crawl_job(db, target.id, target.base_url, user_id=target.user_id)
 
 
-def create_all_target_crawl_jobs(db: Session) -> list[CrawlJob]:
-    return [create_target_crawl_job(db, target) for target in list_crawl_targets(db)]
+def create_all_target_crawl_jobs(db: Session, *, user_id: uuid.UUID) -> list[CrawlJob]:
+    return [
+        create_target_crawl_job(db, target)
+        for target in list_crawl_targets(db, user_id=user_id)
+    ]
 
 
 def run_queued_target_crawl(job_id: uuid.UUID) -> None:
@@ -49,7 +52,12 @@ def run_target_crawl_job(db: Session, job_id: uuid.UUID) -> None:
         logger.error("Queued crawl job not found: %s", job_id)
         return
 
-    target = db.scalar(select(CrawlTarget).where(CrawlTarget.id == job.target_id))
+    target = db.scalar(
+        select(CrawlTarget).where(
+            CrawlTarget.id == job.target_id,
+            CrawlTarget.user_id == job.user_id,
+        )
+    )
     if target is None:
         update_crawl_job(
             db,
