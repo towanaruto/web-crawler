@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import { db } from "@/db/client";
 import { crawlTargets } from "@/db/schema";
-import { triggerCrawl } from "@/app/actions";
+import { triggerCrawl, type CrawlRequestResult } from "@/app/actions";
 
 export type AddTargetInput = {
   base_url: string;
@@ -52,6 +52,6 @@ export async function deactivateTargetAction(id: string) {
   revalidatePath("/targets");
 }
 
-export async function crawlAction(targetId?: string): Promise<void> {
-  await triggerCrawl(targetId);
+export async function crawlAction(targetId?: string): Promise<CrawlRequestResult> {
+  return triggerCrawl(targetId);
 }

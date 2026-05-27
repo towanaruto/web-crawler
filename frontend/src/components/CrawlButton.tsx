@@ -11,10 +11,10 @@ export default function CrawlButton() {
     setLoading(true);
     setResult(null);
     try {
-      await crawlAction();
-      setResult("Queued — see GitHub Actions tab for progress.");
+      const result = await crawlAction();
+      setResult(formatResult(result.targetsQueued, result.jobIds));
     } catch {
-      setResult("Failed to dispatch crawl workflow.");
+      setResult("Failed to start crawl.");
     } finally {
       setLoading(false);
     }
@@ -52,3 +52,10 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#555",
   },
 };
+
+function formatResult(targetsQueued: number, jobIds: string[]) {
+  if (jobIds.length > 0) {
+    return `Queued ${jobIds.length} crawl job${jobIds.length === 1 ? "" : "s"}.`;
+  }
+  return `Started crawl for ${targetsQueued} target${targetsQueued === 1 ? "" : "s"}.`;
+}
