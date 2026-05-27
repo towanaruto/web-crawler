@@ -1,34 +1,38 @@
-/**
- * Neon HTTP driver via Drizzle. Works in both Vercel Edge and Node runtimes.
- *
- * The HTTP driver issues one round-trip per query (no persistent connection),
- * which is ideal for serverless. For interactive transactions or LISTEN/NOTIFY
- * we would switch to drizzle-orm/neon-serverless (WebSocket).
- *
- * Initialization is lazy (Proxy-based) so that Next.js build-time page-data
- * collection can run without a real DATABASE_URL — the connection only opens
- * the first time a query is executed.
- */
 import { neon } from "@neondatabase/serverless";
-import { drizzle, type NeonHttpDatabase } from "drizzle-orm/neon-http";
+import { Pool } from "pg";
+import { drizzle as drizzleNeon, type NeonHttpDatabase } from "drizzle-orm/neon-http";
+import {
+  drizzle as drizzleNodePostgres,
+  type NodePgDatabase,
+} from "drizzle-orm/node-postgres";
 
 import * as schema from "./schema";
 
-type Db = NeonHttpDatabase<typeof schema>;
+type Db = NeonHttpDatabase<typeof schema> | NodePgDatabase<typeof schema>;
 
 let _db: Db | null = null;
 
 function getDb(): Db {
   if (_db) return _db;
-  if (!process.env.DATABASE_URL) {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
     throw new Error("DATABASE_URL is not set");
   }
-  const sql = neon(process.env.DATABASE_URL);
-  _db = drizzle(sql, { schema });
+  if (isNeonHttpUrl(databaseUrl)) {
+    const sql = neon(databaseUrl);
+    _db = drizzleNeon(sql, { schema });
+  } else {
+    const pool = new Pool({ connectionString: databaseUrl });
+    _db = drizzleNodePostgres(pool, { schema });
+  }
   return _db;
 }
 
-export const db: Db = new Proxy({} as Db, {
+function isNeonHttpUrl(databaseUrl: string): boolean {
+  return databaseUrl.includes("neon.tech");
+}
+
+export const db = new Proxy({} as Db, {
   get(_target, prop, receiver) {
     return Reflect.get(getDb(), prop, receiver);
   },
