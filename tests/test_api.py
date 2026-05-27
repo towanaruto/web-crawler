@@ -133,11 +133,10 @@ def test_crawl_queues_all_active_targets(api_db_session, monkeypatch):
 
     assert response.status_code == 202
     body = response.json()
-    assert len(body) == 1
-    assert body[0]["target_id"] == str(active_target.id)
-    assert body[0]["target_url"] == "https://example.com"
-    assert body[0]["status"] == "pending"
-    assert queued_job_ids == [uuid.UUID(body[0]["id"])]
+    assert body["user_id"] == str(user.id)
+    assert body["targets_queued"] == 1
+    assert len(body["job_ids"]) == 1
+    assert queued_job_ids == [uuid.UUID(body["job_ids"][0])]
 
 
 def test_list_crawl_jobs(api_db_session):

@@ -24,11 +24,12 @@ app = FastAPI(title="Web Crawler API")
 class HealthResponse(BaseModel):
     status: str
 
+
 class CrawlSummaryResponse(BaseModel):
-    targets_crawled: int
-    articles_found: int
-    pages_crawled: int
-    failed: int
+    user_id: uuid.UUID
+    targets_queued: int
+    job_ids: list[uuid.UUID]
+
 
 class CrawlJobResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -88,7 +89,7 @@ def health() -> HealthResponse:
 
 @app.post(
     "/crawl",
-    response_model=list[CrawlJobResponse],
+    response_model=CrawlSummaryResponse,
     status_code=status.HTTP_202_ACCEPTED,
 )
 def start_crawl(
@@ -96,12 +97,16 @@ def start_crawl(
     body: UserScopedRequest,
     db: Session = Depends(get_db),
     _: None = Depends(require_internal_api_key),
-) -> list[CrawlJob]:
+) -> CrawlSummaryResponse:
     jobs = create_all_target_crawl_jobs(db, user_id=body.user_id)
     db.commit()
     for job in jobs:
         background_tasks.add_task(run_queued_target_crawl, job.id)
-    return jobs
+    return CrawlSummaryResponse(
+        user_id=body.user_id,
+        targets_queued=len(jobs),
+        job_ids=[job.id for job in jobs],
+    )
 
 
 @app.post(

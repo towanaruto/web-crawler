@@ -25,7 +25,8 @@ type BackendCrawlJob = {
 };
 
 type BackendCrawlSummary = {
-  targets_crawled?: unknown;
+  targets_queued?: unknown;
+  job_ids?: unknown;
 };
 
 export async function triggerCrawl(targetId?: string): Promise<CrawlRequestResult> {
@@ -73,10 +74,14 @@ function toCrawlRequestResult(body: unknown): CrawlRequestResult {
 
   if (isRecord(body)) {
     const jobId = typeof body.id === "string" ? body.id : null;
-    const targetsCrawled = (body as BackendCrawlSummary).targets_crawled;
+    const summary = body as BackendCrawlSummary;
+    const jobIds = Array.isArray(summary.job_ids)
+      ? summary.job_ids.filter((id): id is string => typeof id === "string")
+      : [];
+    const targetsQueued = summary.targets_queued;
     return {
-      jobIds: jobId ? [jobId] : [],
-      targetsQueued: typeof targetsCrawled === "number" ? targetsCrawled : 1,
+      jobIds: jobIds.length > 0 ? jobIds : jobId ? [jobId] : [],
+      targetsQueued: typeof targetsQueued === "number" ? targetsQueued : 1,
     };
   }
 
