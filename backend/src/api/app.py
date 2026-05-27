@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, status, BackgroundTasks
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -12,29 +12,17 @@ from src.auth.invites import consume_verified_invite, verify_invite
 from src.config.settings import settings
 from src.db.engine import get_db
 from src.db.models import CrawlJob, CrawlTarget
-from src.scheduler.job_manager import crawl_all, crawl_target
-from src.scheduler.rate_limiter import TokenBucketRateLimiter
-from src.storage.r2 import build_r2_storage_from_settings
+from src.scheduler.crawl_jobs import (
+    create_all_target_crawl_jobs,
+    create_target_crawl_job,
+    run_queued_target_crawl,
+)
 
 app = FastAPI(title="Web Crawler API")
 
 
 class HealthResponse(BaseModel):
     status: str
-
-
-class CrawlSummaryResponse(BaseModel):
-    targets_crawled: int
-    articles_found: int
-    pages_crawled: int
-    failed: int
-
-
-class CrawlTargetResponse(BaseModel):
-    articles: int
-    pages_crawled: int
-    max_depth_used: int
-    keywords_used: list[str]
 
 
 class CrawlJobResponse(BaseModel):
@@ -100,8 +88,10 @@ def start_crawl(
 
 
 @app.post("/crawl/{target_id}", response_model=CrawlTargetResponse)
+
 def start_target_crawl(
     target_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     user_id: uuid.UUID = Query(...),
     _: None = Depends(require_internal_api_key),
@@ -117,9 +107,10 @@ def start_target_crawl(
     if not target.is_active:
         raise HTTPException(status_code=400, detail="Crawl target is inactive")
 
-    rate_limiter = TokenBucketRateLimiter(rate=1.0, capacity=5)
-    r2 = build_r2_storage_from_settings(settings)
-    return crawl_target(db, target, rate_limiter, r2=r2)
+    job = create_target_crawl_job(db, target)
+    db.commit()
+    background_tasks.add_task(run_queued_target_crawl, job.id)
+    return job
 
 
 @app.get("/crawl-jobs", response_model=list[CrawlJobResponse])
