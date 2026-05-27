@@ -24,6 +24,11 @@ app = FastAPI(title="Web Crawler API")
 class HealthResponse(BaseModel):
     status: str
 
+class CrawlSummaryResponse(BaseModel):
+    targets_crawled: int
+    articles_found: int
+    pages_crawled: int
+    failed: int
 
 class CrawlJobResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
