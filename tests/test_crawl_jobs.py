@@ -2,11 +2,19 @@ from src.db.models import CrawlJob, CrawlTarget
 from src.scheduler import crawl_jobs
 
 
-def test_run_target_crawl_job_marks_completed(db_session, monkeypatch):
-    target = CrawlTarget(base_url="https://example.com", crawl_mode="static")
+def test_run_target_crawl_job_marks_completed(db_session, monkeypatch, auth_user):
+    target = CrawlTarget(
+        user_id=auth_user.id,
+        base_url="https://example.com",
+        crawl_mode="static",
+    )
     db_session.add(target)
     db_session.flush()
-    job = CrawlJob(target_id=target.id, target_url=target.base_url)
+    job = CrawlJob(
+        user_id=auth_user.id,
+        target_id=target.id,
+        target_url=target.base_url,
+    )
     db_session.add(job)
     db_session.flush()
 
@@ -24,11 +32,19 @@ def test_run_target_crawl_job_marks_completed(db_session, monkeypatch):
     assert job.finished_at is not None
 
 
-def test_run_target_crawl_job_marks_failed_on_exception(db_session, monkeypatch):
-    target = CrawlTarget(base_url="https://example.com", crawl_mode="static")
+def test_run_target_crawl_job_marks_failed_on_exception(db_session, monkeypatch, auth_user):
+    target = CrawlTarget(
+        user_id=auth_user.id,
+        base_url="https://example.com",
+        crawl_mode="static",
+    )
     db_session.add(target)
     db_session.flush()
-    job = CrawlJob(target_id=target.id, target_url=target.base_url)
+    job = CrawlJob(
+        user_id=auth_user.id,
+        target_id=target.id,
+        target_url=target.base_url,
+    )
     db_session.add(job)
     db_session.flush()
 
@@ -46,15 +62,20 @@ def test_run_target_crawl_job_marks_failed_on_exception(db_session, monkeypatch)
     assert job.finished_at is not None
 
 
-def test_run_target_crawl_job_skips_inactive_target(db_session):
+def test_run_target_crawl_job_skips_inactive_target(db_session, auth_user):
     target = CrawlTarget(
+        user_id=auth_user.id,
         base_url="https://example.com",
         crawl_mode="static",
         is_active=False,
     )
     db_session.add(target)
     db_session.flush()
-    job = CrawlJob(target_id=target.id, target_url=target.base_url)
+    job = CrawlJob(
+        user_id=auth_user.id,
+        target_id=target.id,
+        target_url=target.base_url,
+    )
     db_session.add(job)
     db_session.flush()
 

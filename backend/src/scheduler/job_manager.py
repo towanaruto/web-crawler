@@ -37,7 +37,13 @@ def _is_same_domain(base_url: str, candidate_url: str) -> bool:
     return urlparse(base_url).netloc.lower() == urlparse(candidate_url).netloc.lower()
 
 
-def _persist_article(db: Session, parsed: dict, r2: R2Storage | None) -> int:
+def _persist_article(
+    db: Session,
+    parsed: dict,
+    r2: R2Storage | None,
+    *,
+    user_id,
+) -> int:
     """Insert or update an article from parsed dict, optionally pushing the
     raw HTML and inline images to R2. Returns 1 if an article was saved, else 0.
     """
@@ -65,7 +71,7 @@ def _persist_article(db: Session, parsed: dict, r2: R2Storage | None) -> int:
         category = get_or_create_category(db, parsed["category_names"][0])
         article_data["category_id"] = category.id
 
-    article = upsert_article(db, article_data)
+    article = upsert_article(db, article_data, user_id=user_id)
 
     if parsed.get("tag_names"):
         for tag_name in parsed["tag_names"]:
@@ -116,7 +122,7 @@ def crawl_target(
         while queue:
             url, depth = queue.popleft()
 
-            job = create_crawl_job(db, target.id, url)
+            job = create_crawl_job(db, target.id, url, user_id=target.user_id)
             update_crawl_job(db, job, status="running", started_at=datetime.now(timezone.utc))
 
             try:
@@ -179,7 +185,7 @@ def crawl_target(
                     db.commit()
                     continue
 
-                saved = _persist_article(db, parsed, r2)
+                saved = _persist_article(db, parsed, r2, user_id=target.user_id)
 
                 update_crawl_job(
                     db, job,
@@ -195,7 +201,7 @@ def crawl_target(
                 logger.exception("Error crawling %s", url)
                 db.rollback()
                 try:
-                    job = create_crawl_job(db, target.id, url)
+                    job = create_crawl_job(db, target.id, url, user_id=target.user_id)
                     update_crawl_job(
                         db, job,
                         status="failed",
@@ -215,12 +221,12 @@ def crawl_target(
     }
 
 
-def crawl_all(db: Session) -> dict:
+def crawl_all(db: Session, *, user_id=None) -> dict:
     """Crawl all active targets. Returns summary stats."""
     from src.config.settings import settings
     from src.storage.r2 import build_r2_storage_from_settings
 
-    targets = list_crawl_targets(db)
+    targets = list_crawl_targets(db, user_id=user_id)
     rate_limiter = TokenBucketRateLimiter(rate=1.0, capacity=5)
     r2 = build_r2_storage_from_settings(settings)
     if r2 is None:

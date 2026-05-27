@@ -2,6 +2,7 @@ import ArticleList from "@/components/ArticleList";
 import Pagination from "@/components/Pagination";
 import SearchBar from "@/components/SearchBar";
 import { listArticles, type ArticleListItem } from "@/db/queries";
+import { requireCurrentUser } from "@/lib/current-user";
 
 export default async function HomePage({
   searchParams,
@@ -10,13 +11,14 @@ export default async function HomePage({
 }) {
   const { page, q } = await searchParams;
   const currentPage = Math.max(1, Number(page) || 1);
+  const user = await requireCurrentUser();
   const limit = 20;
   const offset = (currentPage - 1) * limit;
 
   let items: ArticleListItem[] = [];
   let total = 0;
   try {
-    const data = await listArticles({ search: q, offset, limit });
+    const data = await listArticles({ userId: user.id, search: q, offset, limit });
     items = data.items;
     total = data.total;
   } catch {

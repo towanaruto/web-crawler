@@ -4,6 +4,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.dialects.postgresql import JSONB
 
 from src.db.models import Base
+from src.db.models import User
 
 
 @event.listens_for(Base.metadata, "before_create")
@@ -39,3 +40,11 @@ def db_session():
     session = Session()
     yield session
     session.close()
+
+
+@pytest.fixture
+def auth_user(db_session):
+    user = User(auth0_sub="auth0|test-user", email="user@example.com")
+    db_session.add(user)
+    db_session.flush()
+    return user

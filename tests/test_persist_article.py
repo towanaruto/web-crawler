@@ -30,9 +30,9 @@ def _parsed(**overrides) -> dict:
 
 
 class TestWithoutR2:
-    def test_persists_without_raw_html_storage(self, db_session):
+    def test_persists_without_raw_html_storage(self, db_session, auth_user):
         # Without R2 the raw HTML is discarded — the article is still saved.
-        result = _persist_article(db_session, _parsed(), r2=None)
+        result = _persist_article(db_session, _parsed(), r2=None, user_id=auth_user.id)
         db_session.commit()
 
         assert result == 1
@@ -41,17 +41,22 @@ class TestWithoutR2:
         assert a.raw_html_r2_key is None
         assert a.image_r2_keys == []
 
-    def test_returns_zero_when_no_title(self, db_session):
-        result = _persist_article(db_session, _parsed(title=""), r2=None)
+    def test_returns_zero_when_no_title(self, db_session, auth_user):
+        result = _persist_article(
+            db_session,
+            _parsed(title=""),
+            r2=None,
+            user_id=auth_user.id,
+        )
         assert result == 0
 
 
 class TestWithR2:
-    def test_uploads_raw_html_and_sets_key(self, db_session):
+    def test_uploads_raw_html_and_sets_key(self, db_session, auth_user):
         r2 = MagicMock()
         r2.put_raw_html.return_value = "articles/xx/raw.html"
 
-        result = _persist_article(db_session, _parsed(), r2=r2)
+        result = _persist_article(db_session, _parsed(), r2=r2, user_id=auth_user.id)
         db_session.commit()
 
         assert result == 1
@@ -60,7 +65,7 @@ class TestWithR2:
         assert a.raw_html_r2_key == "articles/xx/raw.html"
         r2.put_raw_html.assert_called_once_with(a.id, "<html>hi</html>")
 
-    def test_downloads_and_uploads_each_image(self, db_session, monkeypatch):
+    def test_downloads_and_uploads_each_image(self, db_session, monkeypatch, auth_user):
         r2 = MagicMock()
         r2.put_raw_html.return_value = "articles/xx/raw.html"
         r2.put_image.side_effect = lambda art_id, idx, content, ct: f"articles/{art_id}/img-{idx:02d}.jpg"
@@ -73,7 +78,7 @@ class TestWithR2:
         )
 
         parsed = _parsed(image_urls=["https://example.com/a.jpg", "https://example.com/b.jpg"])
-        result = _persist_article(db_session, parsed, r2=r2)
+        result = _persist_article(db_session, parsed, r2=r2, user_id=auth_user.id)
         db_session.commit()
 
         assert result == 1
@@ -85,7 +90,7 @@ class TestWithR2:
         ]
         assert r2.put_image.call_count == 2
 
-    def test_skips_failed_image_downloads(self, db_session, monkeypatch):
+    def test_skips_failed_image_downloads(self, db_session, monkeypatch, auth_user):
         r2 = MagicMock()
         r2.put_raw_html.return_value = "k"
         r2.put_image.side_effect = lambda art_id, idx, c, ct: f"img-{idx}"
@@ -96,7 +101,7 @@ class TestWithR2:
         monkeypatch.setattr(jm, "fetch_image", lambda url, **kw: results.pop(0))
 
         parsed = _parsed(image_urls=["a", "b", "c"])
-        _persist_article(db_session, parsed, r2=r2)
+        _persist_article(db_session, parsed, r2=r2, user_id=auth_user.id)
         db_session.commit()
 
         from src.db.models import Article

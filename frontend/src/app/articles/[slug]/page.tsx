@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { getArticleBySlug } from "@/db/queries";
+import { requireCurrentUser } from "@/lib/current-user";
 
 export default async function ArticlePage({
   params,
@@ -8,7 +9,8 @@ export default async function ArticlePage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const article = await getArticleBySlug(slug);
+  const user = await requireCurrentUser();
+  const article = await getArticleBySlug(slug, user.id);
   if (!article) notFound();
 
   return (

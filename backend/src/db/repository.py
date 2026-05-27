@@ -7,6 +7,7 @@ from slugify import slugify
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from src.auth.invites import attach_invite_to_user, normalize_email
 from src.db.models import (
     Article,
     Author,
@@ -14,6 +15,7 @@ from src.db.models import (
     CrawlJob,
     CrawlTarget,
     Tag,
+    User,
 )
 
 
@@ -22,12 +24,17 @@ from src.db.models import (
 def list_articles(
     db: Session,
     *,
+    user_id: uuid.UUID,
     category_slug: str | None = None,
     search: str | None = None,
     offset: int = 0,
     limit: int = 20,
 ) -> tuple[Sequence[Article], int]:
-    query = select(Article).order_by(Article.crawled_at.desc().nullslast())
+    query = (
+        select(Article)
+        .where(Article.user_id == user_id)
+        .order_by(Article.crawled_at.desc().nullslast())
+    )
 
     if category_slug:
         query = query.join(Category).where(Category.slug == category_slug)
@@ -45,14 +52,19 @@ def list_articles(
     return articles, total or 0
 
 
-def get_article_by_slug(db: Session, slug: str) -> Article | None:
-    return db.scalar(select(Article).where(Article.slug == slug))
+def get_article_by_slug(db: Session, slug: str, *, user_id: uuid.UUID) -> Article | None:
+    return db.scalar(
+        select(Article).where(Article.slug == slug, Article.user_id == user_id)
+    )
 
 
-def upsert_article(db: Session, data: dict) -> Article:
-    """Insert or update an article based on source_url uniqueness."""
+def upsert_article(db: Session, data: dict, *, user_id: uuid.UUID) -> Article:
+    """Insert or update a user-owned article based on source_url uniqueness."""
     existing = db.scalar(
-        select(Article).where(Article.source_url == data["source_url"])
+        select(Article).where(
+            Article.source_url == data["source_url"],
+            Article.user_id == user_id,
+        )
     )
     if existing:
         for key, value in data.items():
@@ -67,18 +79,23 @@ def upsert_article(db: Session, data: dict) -> Article:
     # Ensure slug uniqueness
     base_slug = data["slug"]
     counter = 1
-    while db.scalar(select(Article).where(Article.slug == data["slug"])):
+    while db.scalar(
+        select(Article).where(Article.slug == data["slug"], Article.user_id == user_id)
+    ):
         data["slug"] = f"{base_slug}-{counter}"
         counter += 1
 
+    data["user_id"] = user_id
     article = Article(**data)
     db.add(article)
     db.flush()
     return article
 
 
-def delete_article(db: Session, article_id: uuid.UUID) -> Article | None:
-    article = db.get(Article, article_id)
+def delete_article(db: Session, article_id: uuid.UUID, *, user_id: uuid.UUID) -> Article | None:
+    article = db.scalar(
+        select(Article).where(Article.id == article_id, Article.user_id == user_id)
+    )
     if article:
         db.delete(article)
         db.flush()
@@ -130,8 +147,15 @@ def get_or_create_tag(db: Session, name: str) -> Tag:
 
 # ── Crawl Targets ─────────────────────────────────────────
 
-def list_crawl_targets(db: Session, active_only: bool = True) -> Sequence[CrawlTarget]:
+def list_crawl_targets(
+    db: Session,
+    active_only: bool = True,
+    *,
+    user_id: uuid.UUID | None = None,
+) -> Sequence[CrawlTarget]:
     query = select(CrawlTarget)
+    if user_id is not None:
+        query = query.where(CrawlTarget.user_id == user_id)
     if active_only:
         query = query.where(CrawlTarget.is_active.is_(True))
     return db.scalars(query).all()
@@ -139,6 +163,7 @@ def list_crawl_targets(db: Session, active_only: bool = True) -> Sequence[CrawlT
 
 def add_crawl_target(
     db: Session,
+    user_id: uuid.UUID,
     base_url: str,
     crawl_mode: str = "static",
     selector_config: dict | None = None,
@@ -148,7 +173,10 @@ def add_crawl_target(
     schedule: str | None = None,
 ) -> CrawlTarget:
     existing = db.scalar(
-        select(CrawlTarget).where(CrawlTarget.base_url == base_url)
+        select(CrawlTarget).where(
+            CrawlTarget.base_url == base_url,
+            CrawlTarget.user_id == user_id,
+        )
     )
     if existing:
         existing.crawl_mode = crawl_mode
@@ -163,6 +191,7 @@ def add_crawl_target(
         return existing
 
     target = CrawlTarget(
+        user_id=user_id,
         base_url=base_url,
         crawl_mode=crawl_mode,
         selector_config=selector_config or {},
@@ -176,8 +205,18 @@ def add_crawl_target(
     return target
 
 
-def deactivate_crawl_target(db: Session, target_id: uuid.UUID) -> CrawlTarget | None:
-    target = db.get(CrawlTarget, target_id)
+def deactivate_crawl_target(
+    db: Session,
+    target_id: uuid.UUID,
+    *,
+    user_id: uuid.UUID,
+) -> CrawlTarget | None:
+    target = db.scalar(
+        select(CrawlTarget).where(
+            CrawlTarget.id == target_id,
+            CrawlTarget.user_id == user_id,
+        )
+    )
     if target:
         target.is_active = False
         db.flush()
@@ -186,8 +225,14 @@ def deactivate_crawl_target(db: Session, target_id: uuid.UUID) -> CrawlTarget | 
 
 # ── Crawl Jobs ────────────────────────────────────────────
 
-def create_crawl_job(db: Session, target_id: uuid.UUID, target_url: str) -> CrawlJob:
-    job = CrawlJob(target_id=target_id, target_url=target_url)
+def create_crawl_job(
+    db: Session,
+    target_id: uuid.UUID,
+    target_url: str,
+    *,
+    user_id: uuid.UUID,
+) -> CrawlJob:
+    job = CrawlJob(user_id=user_id, target_id=target_id, target_url=target_url)
     db.add(job)
     db.flush()
     return job
@@ -198,3 +243,34 @@ def update_crawl_job(db: Session, job: CrawlJob, **kwargs) -> CrawlJob:
         setattr(job, key, value)
     db.flush()
     return job
+
+
+# ── Users ──────────────────────────────────────────────────
+
+def upsert_user_from_auth0(
+    db: Session,
+    *,
+    auth0_sub: str,
+    email: str,
+    name: str | None = None,
+    picture_url: str | None = None,
+) -> User:
+    email_norm = normalize_email(email)
+    user = db.scalar(select(User).where(User.auth0_sub == auth0_sub))
+    if user is None:
+        user = User(
+            auth0_sub=auth0_sub,
+            email=email_norm,
+            name=name,
+            picture_url=picture_url,
+        )
+        db.add(user)
+        db.flush()
+    else:
+        user.email = email_norm
+        user.name = name
+        user.picture_url = picture_url
+        db.flush()
+
+    attach_invite_to_user(db, user=user)
+    return user

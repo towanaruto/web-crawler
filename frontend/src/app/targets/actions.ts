@@ -1,11 +1,12 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import { db } from "@/db/client";
 import { crawlTargets } from "@/db/schema";
 import { triggerCrawl, type CrawlRequestResult } from "@/app/actions";
+import { requireCurrentUser } from "@/lib/current-user";
 
 export type AddTargetInput = {
   base_url: string;
@@ -17,11 +18,13 @@ export type AddTargetInput = {
 };
 
 export async function addTargetAction(data: AddTargetInput) {
+  const user = await requireCurrentUser();
   // Mirror backend repository.add_crawl_target: upsert on base_url and reset
   // is_active=true so the manual reactivation case keeps working.
   await db
     .insert(crawlTargets)
     .values({
+      userId: user.id,
       baseUrl: data.base_url,
       crawlMode: data.crawl_mode ?? "static",
       maxDepth: data.max_depth ?? 2,
@@ -31,7 +34,7 @@ export async function addTargetAction(data: AddTargetInput) {
       isActive: true,
     })
     .onConflictDoUpdate({
-      target: crawlTargets.baseUrl,
+      target: [crawlTargets.userId, crawlTargets.baseUrl],
       set: {
         crawlMode: data.crawl_mode ?? "static",
         maxDepth: data.max_depth ?? 2,
@@ -45,10 +48,11 @@ export async function addTargetAction(data: AddTargetInput) {
 }
 
 export async function deactivateTargetAction(id: string) {
+  const user = await requireCurrentUser();
   await db
     .update(crawlTargets)
     .set({ isActive: false })
-    .where(eq(crawlTargets.id, id));
+    .where(and(eq(crawlTargets.id, id), eq(crawlTargets.userId, user.id)));
   revalidatePath("/targets");
 }
 
