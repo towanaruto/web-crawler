@@ -1,0 +1,77 @@
+@import url("https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@300;400;600&display=swap");
+
+:root {
+  --crawler-font-family: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  --crawler-font-weight-display: 300;
+  --crawler-font-weight-body: 400;
+  --crawler-font-weight-emphasis: 600;
+
+  --crawler-surface-bg: #ffffff;
+  --crawler-surface-raised: #f4f4f4;
+  --crawler-surface-muted: #e0e0e0;
+  --crawler-border-subtle: #e0e0e0;
+  --crawler-border-strong: #8d8d8d;
+  --crawler-text-primary: #161616;
+  --crawler-text-secondary: #525252;
+  --crawler-text-tertiary: #6f6f6f;
+  --crawler-accent-primary: #0f62fe;
+  --crawler-accent-hover: #0353e9;
+  --crawler-focus-ring: #0f62fe;
+  --crawler-text-on-accent: #ffffff;
+
+  --crawler-space-1: 8px;
+  --crawler-space-2: 16px;
+  --crawler-space-3: 24px;
+  --crawler-space-4: 32px;
+  --crawler-space-5: 40px;
+  --crawler-space-6: 48px;
+  --crawler-space-8: 64px;
+
+  --crawler-radius-sm: 8px;
+  --crawler-radius-md: 11px;
+  --crawler-radius-lg: 18px;
+  --crawler-radius-pill: 9999px;
+
+  --crawler-duration-fast: 150ms;
+  --crawler-duration-base: 200ms;
+  --crawler-duration-slow: 300ms;
+  --crawler-easing-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--crawler-surface-bg);
+  color: var(--crawler-text-primary);
+  font-family: var(--crawler-font-family);
+}
+
+body {
+  margin: 0;
+  background: var(--crawler-surface-bg);
+  color: var(--crawler-text-primary);
+  font-family: var(--crawler-font-family);
+  font-weight: var(--crawler-font-weight-body);
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--crawler-focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
