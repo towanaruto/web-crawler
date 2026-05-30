@@ -14,7 +14,6 @@ export type AddTargetInput = {
   max_depth?: number;
   keywords?: string[];
   keyword_mode?: string;
-  schedule?: string | null;
 };
 
 export async function addTargetAction(data: AddTargetInput) {
@@ -30,7 +29,6 @@ export async function addTargetAction(data: AddTargetInput) {
       maxDepth: data.max_depth ?? 2,
       keywords: data.keywords ?? [],
       keywordMode: data.keyword_mode ?? "any",
-      schedule: data.schedule ?? null,
       isActive: true,
     })
     .onConflictDoUpdate({
@@ -40,7 +38,6 @@ export async function addTargetAction(data: AddTargetInput) {
         maxDepth: data.max_depth ?? 2,
         keywords: data.keywords ?? [],
         keywordMode: data.keyword_mode ?? "any",
-        schedule: data.schedule ?? null,
         isActive: true,
       },
     });

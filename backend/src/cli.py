@@ -27,7 +27,6 @@ def add_target(
     max_depth: int = typer.Option(2, help="Max crawl depth"),
     keywords: str = typer.Option("", help="Comma-separated keywords for filtering"),
     keyword_mode: str = typer.Option("any", help="Keyword match mode: any or all"),
-    schedule: str = typer.Option(None, help='Cron expression, e.g. "0 */6 * * *"'),
 ):
     """Add a crawl target URL."""
     kw_list = [k.strip() for k in keywords.split(",") if k.strip()] if keywords else []
@@ -39,13 +38,10 @@ def add_target(
             max_depth=max_depth,
             keywords=kw_list,
             keyword_mode=keyword_mode,
-            schedule=schedule,
         )
         typer.echo(f"Added target: {target.base_url} (mode={target.crawl_mode})")
         if kw_list:
             typer.echo(f"  keywords={kw_list}  mode={keyword_mode}")
-        if schedule:
-            typer.echo(f"  schedule={schedule}")
 
 
 @app.command()
@@ -60,8 +56,6 @@ def list_targets():
             parts = [f"  [{t.crawl_mode}] {t.base_url}"]
             if t.keywords:
                 parts.append(f"  keywords={t.keywords}")
-            if t.schedule:
-                parts.append(f"  schedule={t.schedule}")
             typer.echo("".join(parts))
 
 
@@ -79,7 +73,7 @@ def crawl():
 
 @app.command("crawl-target")
 def crawl_one(target_id: str):
-    """Crawl a single target by UUID. Used by workflow_dispatch from the UI."""
+    """Crawl a single target by UUID."""
     try:
         tid = uuid.UUID(target_id)
     except ValueError:

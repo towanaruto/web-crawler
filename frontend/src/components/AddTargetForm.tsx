@@ -14,7 +14,6 @@ export default function AddTargetForm() {
   const [maxDepth, setMaxDepth] = useState(2);
   const [keywords, setKeywords] = useState("");
   const [keywordMode, setKeywordMode] = useState("any");
-  const [schedule, setSchedule] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -28,14 +27,12 @@ export default function AddTargetForm() {
           ? keywords.split(",").map((k) => k.trim()).filter(Boolean)
           : [],
         keyword_mode: keywordMode,
-        schedule: schedule || null,
       });
       setUrl("");
       setCrawlMode("static");
       setMaxDepth(2);
       setKeywords("");
       setKeywordMode("any");
-      setSchedule("");
       setOpen(false);
       router.refresh();
     } catch {
@@ -112,16 +109,6 @@ export default function AddTargetForm() {
             <option value="all">all</option>
           </select>
         </div>
-      </div>
-      <div style={styles.field}>
-        <label style={styles.label}>Schedule (cron expression, optional)</label>
-        <input
-          type="text"
-          value={schedule}
-          onChange={(e) => setSchedule(e.target.value)}
-          placeholder="0 */6 * * *"
-          style={styles.input}
-        />
       </div>
       <div style={styles.actions}>
         <button type="submit" disabled={loading} style={styles.submitBtn}>
