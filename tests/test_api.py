@@ -185,6 +185,57 @@ def test_crawl_rejects_missing_internal_api_key(api_db_session, monkeypatch):
     assert response.status_code == 401
 
 
+def test_scheduler_tick_requires_internal_api_key(api_db_session, monkeypatch):
+    monkeypatch.setattr(settings, "BACKEND_API_TOKEN", "secret")
+    app.dependency_overrides[get_db] = _override_db(api_db_session)
+    client = TestClient(app)
+
+    try:
+        response = client.post("/scheduler/tick")
+    finally:
+        app.dependency_overrides.clear()
+        monkeypatch.setattr(settings, "BACKEND_API_TOKEN", None)
+
+    assert response.status_code == 401
+
+
+def test_scheduler_tick_queues_due_targets(api_db_session, monkeypatch):
+    user = _user(api_db_session)
+    queued_job_ids = []
+
+    def fake_run_queued_target_crawl(job_id):
+        queued_job_ids.append(job_id)
+
+    monkeypatch.setattr(api_app, "run_queued_target_crawl", fake_run_queued_target_crawl)
+
+    target = CrawlTarget(
+        user_id=user.id,
+        base_url="https://example.com",
+        crawl_mode="static",
+        schedule_enabled=True,
+        schedule_config={"type": "interval", "value": 1, "unit": "hours"},
+        schedule_timezone="Asia/Tokyo",
+        next_run_at=datetime.now(timezone.utc) - timedelta(minutes=5),
+    )
+    api_db_session.add(target)
+    api_db_session.flush()
+
+    app.dependency_overrides[get_db] = _override_db(api_db_session)
+    client = TestClient(app)
+
+    try:
+        response = client.post("/scheduler/tick")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 202
+    body = response.json()
+    assert body["targets_checked"] == 1
+    assert body["targets_queued"] == 1
+    assert len(body["job_ids"]) == 1
+    assert queued_job_ids == [uuid.UUID(body["job_ids"][0])]
+
+
 def test_target_crawl_cannot_use_another_users_target(api_db_session):
     owner = _user(api_db_session, "owner@example.com")
     other = _user(api_db_session, "other@example.com")

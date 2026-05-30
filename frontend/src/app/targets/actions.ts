@@ -4,9 +4,10 @@ import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import { db } from "@/db/client";
-import { crawlTargets } from "@/db/schema";
+import { crawlTargets, type CrawlScheduleConfig } from "@/db/schema";
 import { triggerCrawl, type CrawlRequestResult } from "@/app/actions";
 import { requireCurrentUser } from "@/lib/current-user";
+import { computeNextRunAt, normalizeScheduleConfig } from "@/lib/schedules";
 
 export type AddTargetInput = {
   base_url: string;
@@ -49,6 +50,24 @@ export async function deactivateTargetAction(id: string) {
   await db
     .update(crawlTargets)
     .set({ isActive: false })
+    .where(and(eq(crawlTargets.id, id), eq(crawlTargets.userId, user.id)));
+  revalidatePath("/targets");
+}
+
+export async function updateTargetScheduleAction(
+  id: string,
+  data: { enabled: boolean; config: CrawlScheduleConfig | null },
+) {
+  const user = await requireCurrentUser();
+  const config = data.enabled && data.config ? normalizeScheduleConfig(data.config) : null;
+  await db
+    .update(crawlTargets)
+    .set({
+      scheduleEnabled: data.enabled,
+      scheduleConfig: config,
+      scheduleTimezone: "Asia/Tokyo",
+      nextRunAt: config ? computeNextRunAt(config) : null,
+    })
     .where(and(eq(crawlTargets.id, id), eq(crawlTargets.userId, user.id)));
   revalidatePath("/targets");
 }

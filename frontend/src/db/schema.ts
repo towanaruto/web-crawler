@@ -20,6 +20,12 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
+export type CrawlScheduleConfig =
+  | { type: "interval"; value: number; unit: "minutes" | "hours" | "days" }
+  | { type: "fixed"; frequency: "hourly"; minute: number }
+  | { type: "fixed"; frequency: "daily"; hour: number; minute: number }
+  | { type: "fixed"; frequency: "monthly"; day: number | "last"; hour: number; minute: number };
+
 export const authors = pgTable("authors", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: varchar("name", { length: 256 }).notNull(),
@@ -122,9 +128,15 @@ export const crawlTargets = pgTable("crawl_targets", {
   isActive: boolean("is_active").default(true),
   keywords: jsonb("keywords").$type<string[]>().default([]),
   keywordMode: varchar("keyword_mode", { length: 10 }).default("any"),
+  scheduleEnabled: boolean("schedule_enabled").notNull().default(false),
+  scheduleConfig: jsonb("schedule_config").$type<CrawlScheduleConfig | null>(),
+  scheduleTimezone: varchar("schedule_timezone", { length: 64 }).notNull().default("Asia/Tokyo"),
+  nextRunAt: timestamp("next_run_at", { withTimezone: true }),
+  lastScheduledAt: timestamp("last_scheduled_at", { withTimezone: true }),
 }, (t) => [
   uniqueIndex("uq_crawl_targets_user_base_url").on(t.userId, t.baseUrl),
   index("ix_crawl_targets_user_active").on(t.userId, t.isActive),
+  index("ix_crawl_targets_schedule_due").on(t.scheduleEnabled, t.nextRunAt),
 ]);
 
 export const crawlJobs = pgTable("crawl_jobs", {

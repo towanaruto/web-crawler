@@ -30,6 +30,7 @@ Web 上の記事を自動収集して Next.js でブログ表示するシステ�
 | Storage | Cloudflare R2(`raw_html` と取得画像のバイナリ) |
 | Frontend | Vercel 上の Next.js(Drizzle で Neon に直接アクセス) |
 | Auth | Auth0 + access code invite |
+| Scheduler | Cloudflare Workers Cron Trigger → Render FastAPI |
 
 ## ディレクトリ
 
@@ -51,6 +52,7 @@ web_crawler/
 │       ├── components/
 │       └── db/             Drizzle schema + queries
 ├── auth0-actions/          Auth0 Action samples
+├── cloudflare/              Scheduler Worker
 └── tests/                  pytest coverage
 ```
 
@@ -178,8 +180,24 @@ docker compose run backend python -m src.cli add-target \
 Render backend は `BACKEND_API_TOKEN` で保護され、ログインユーザーの
 `user_id` に紐づく target だけをクロールする。
 
-旧 GitHub Actions の scheduled crawl は廃止済み。自動実行が必要な場合は、
-Render 側の worker / cron job など backend API に近い場所で改めて管理する。
+### スケジューラー
+
+`/targets` の各 target で Scheduler をオンにすると、JST・5 分精度で
+自動 crawl を予約できる。Cloudflare Workers Cron Trigger が 5 分ごとに
+Render の `/scheduler/tick` を叩き、backend が due target を crawl job として
+enqueue する。Render Free の backend が sleep していても、この HTTP request で
+wake される。
+
+Cloudflare Worker の設定:
+
+```bash
+cd cloudflare/scheduler-worker
+npx wrangler secret put BACKEND_API_URL
+npx wrangler secret put BACKEND_API_TOKEN
+npx wrangler deploy
+```
+
+旧 GitHub Actions の scheduled crawl は廃止済み。
 
 ### スキーマ変更
 
