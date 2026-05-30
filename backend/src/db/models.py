@@ -188,6 +188,11 @@ class CrawlTarget(Base):
     is_active = Column(Boolean, default=True)
     keywords = Column(JSONB, default=list)
     keyword_mode = Column(String(10), default="any")
+    schedule_enabled = Column(Boolean, default=False, nullable=False)
+    schedule_config = Column(JSONB, default=dict)
+    schedule_timezone = Column(String(64), default="Asia/Tokyo", nullable=False)
+    next_run_at = Column(DateTime(timezone=True), nullable=True)
+    last_scheduled_at = Column(DateTime(timezone=True), nullable=True)
 
     user = relationship("User", back_populates="crawl_targets")
     jobs = relationship("CrawlJob", back_populates="target")
@@ -195,6 +200,7 @@ class CrawlTarget(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "base_url", name="uq_crawl_targets_user_base_url"),
         Index("ix_crawl_targets_user_active", "user_id", "is_active"),
+        Index("ix_crawl_targets_schedule_due", "schedule_enabled", "next_run_at"),
     )
 
 

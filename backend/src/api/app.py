@@ -17,6 +17,7 @@ from src.scheduler.crawl_jobs import (
     create_target_crawl_job,
     run_queued_target_crawl,
 )
+from src.scheduler.scheduled_crawls import enqueue_due_scheduled_crawls
 
 app = FastAPI(title="Web Crawler API")
 
@@ -44,6 +45,14 @@ class CrawlJobResponse(BaseModel):
     articles_found: int | None
     started_at: datetime | None
     finished_at: datetime | None
+
+
+class SchedulerTickResponse(BaseModel):
+    targets_checked: int
+    targets_queued: int
+    skipped_active_jobs: int
+    invalid_schedules: int
+    job_ids: list[uuid.UUID]
 
 
 CrawlTargetResponse = CrawlJobResponse
@@ -167,6 +176,30 @@ def get_crawl_job(
     if job is None:
         raise HTTPException(status_code=404, detail="Crawl job not found")
     return job
+
+
+@app.post(
+    "/scheduler/tick",
+    response_model=SchedulerTickResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def scheduler_tick(
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    limit: int = Query(default=50, ge=1, le=100),
+    _: None = Depends(require_internal_api_key),
+) -> SchedulerTickResponse:
+    result = enqueue_due_scheduled_crawls(db, limit=limit)
+    db.commit()
+    for job_id in result.job_ids:
+        background_tasks.add_task(run_queued_target_crawl, job_id)
+    return SchedulerTickResponse(
+        targets_checked=result.targets_checked,
+        targets_queued=result.targets_queued,
+        skipped_active_jobs=result.skipped_active_jobs,
+        invalid_schedules=result.invalid_schedules,
+        job_ids=result.job_ids,
+    )
 
 
 @app.post("/auth/invites/verify", response_model=InviteResponse)

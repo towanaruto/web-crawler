@@ -5,7 +5,7 @@
 import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 
 import { db } from "./client";
-import { articles, crawlTargets } from "./schema";
+import { articles, crawlTargets, type CrawlScheduleConfig } from "./schema";
 
 export type ArticleListItem = {
   id: string;
@@ -38,6 +38,11 @@ export type CrawlTargetItem = {
   isActive: boolean | null;
   keywords: string[];
   keywordMode: string;
+  scheduleEnabled: boolean;
+  scheduleConfig: CrawlScheduleConfig | null;
+  scheduleTimezone: string;
+  nextRunAt: Date | null;
+  lastScheduledAt: Date | null;
 };
 
 export async function listArticles(opts: {
@@ -115,6 +120,11 @@ export async function listActiveCrawlTargets(userId: string): Promise<CrawlTarge
     isActive: t.isActive,
     keywords: t.keywords ?? [],
     keywordMode: t.keywordMode ?? "any",
+    scheduleEnabled: t.scheduleEnabled,
+    scheduleConfig: t.scheduleConfig,
+    scheduleTimezone: t.scheduleTimezone,
+    nextRunAt: t.nextRunAt,
+    lastScheduledAt: t.lastScheduledAt,
   }));
 }
 

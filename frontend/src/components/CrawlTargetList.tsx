@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CrawlTargetItem } from "@/db/queries";
 import { crawlAction, deactivateTargetAction } from "@/app/targets/actions";
+import TargetScheduleForm from "@/components/TargetScheduleForm";
 
 export default function CrawlTargetList({
   targets,
@@ -89,6 +90,7 @@ export default function CrawlTargetList({
               </span>
             )}
           </div>
+          <TargetScheduleForm target={t} />
         </div>
       ))}
     </div>
