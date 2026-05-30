@@ -1,0 +1,15 @@
+.empty {
+  color: var(--crawler-text-tertiary);
+  padding: var(--crawler-space-5) 0;
+}
+
+.grid {
+  align-items: stretch;
+  display: grid;
+  gap: var(--crawler-space-3);
+  grid-auto-rows: 1fr;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(min(100%, calc(var(--crawler-space-5) * 6)), 1fr)
+  );
+}
