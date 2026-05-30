@@ -48,6 +48,20 @@ Use CSS custom properties with the `--crawler-*` prefix.
 | `--crawler-accent-hover` | `#0353e9` | Primary hover color |
 | `--crawler-focus-ring` | `#0f62fe` | Keyboard focus outline |
 | `--crawler-text-on-accent` | `#ffffff` | Text on accent backgrounds |
+| `--crawler-danger-primary` | `#dc2626` | Destructive actions |
+| `--crawler-success-primary` | `#15803d` | Success states |
+
+## Type Scale
+
+| Token | Value | Purpose |
+| --- | --- | --- |
+| `--crawler-font-size-micro` | `12px` | Tags and compact captions |
+| `--crawler-font-size-caption` | `13px` | Dense metadata and controls |
+| `--crawler-font-size-sm` | `14px` | Secondary UI text |
+| `--crawler-font-size-md` | `16px` | Inputs and body-sized controls |
+| `--crawler-font-size-title` | `20px` | Compact brand/title text |
+| `--crawler-font-size-page` | `28px` | Page headings |
+| `--crawler-font-size-article` | `32px` | Article detail headings |
 
 ## Spacing
 

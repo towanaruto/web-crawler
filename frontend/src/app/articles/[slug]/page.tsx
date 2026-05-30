@@ -15,7 +15,13 @@ export default async function ArticlePage({
 
   return (
     <article>
-      <h1 style={{ fontSize: 32, fontWeight: 700, marginBottom: 8 }}>
+      <h1
+        style={{
+          fontSize: "var(--crawler-font-size-article)",
+          fontWeight: "var(--crawler-font-weight-emphasis)",
+          marginBottom: "var(--crawler-space-1)",
+        }}
+      >
         {article.title}
       </h1>
       <div style={styles.meta}>
@@ -61,34 +67,34 @@ export default async function ArticlePage({
 const styles: Record<string, React.CSSProperties> = {
   meta: {
     display: "flex",
-    gap: 16,
-    color: "#666",
-    fontSize: 14,
-    marginBottom: 16,
+    gap: "var(--crawler-space-2)",
+    color: "var(--crawler-text-tertiary)",
+    fontSize: "var(--crawler-font-size-sm)",
+    marginBottom: "var(--crawler-space-2)",
   },
   tags: {
     display: "flex",
-    gap: 6,
-    marginBottom: 24,
+    gap: "var(--crawler-space-1)",
+    marginBottom: "var(--crawler-space-3)",
   },
   tag: {
-    fontSize: 12,
-    backgroundColor: "#e8f4f8",
-    padding: "2px 8px",
-    borderRadius: 12,
-    color: "#0369a1",
+    fontSize: "var(--crawler-font-size-micro)",
+    backgroundColor: "var(--crawler-surface-raised)",
+    padding: "0 var(--crawler-space-1)",
+    borderRadius: "var(--crawler-radius-pill)",
+    color: "var(--crawler-accent-primary)",
   },
   body: {
     lineHeight: 1.8,
-    marginTop: 24,
+    marginTop: "var(--crawler-space-3)",
   },
   footer: {
-    marginTop: 48,
-    paddingTop: 16,
-    borderTop: "1px solid #e5e7eb",
+    marginTop: "var(--crawler-space-6)",
+    paddingTop: "var(--crawler-space-2)",
+    borderTop: "1px solid var(--crawler-border-subtle)",
     display: "flex",
     justifyContent: "space-between",
-    fontSize: 14,
-    color: "#888",
+    fontSize: "var(--crawler-font-size-sm)",
+    color: "var(--crawler-text-tertiary)",
   },
 };
