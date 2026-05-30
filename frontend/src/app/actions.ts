@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import { db } from "@/db/client";
@@ -12,6 +12,17 @@ export async function deleteArticleAction(id: string) {
   await db
     .delete(articles)
     .where(and(eq(articles.id, id), eq(articles.userId, user.id)));
+  revalidatePath("/");
+}
+
+export async function deleteArticlesAction(ids: string[]) {
+  const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+  if (uniqueIds.length === 0) return;
+
+  const user = await requireCurrentUser();
+  await db
+    .delete(articles)
+    .where(and(inArray(articles.id, uniqueIds), eq(articles.userId, user.id)));
   revalidatePath("/");
 }
 

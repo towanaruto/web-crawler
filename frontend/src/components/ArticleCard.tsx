@@ -7,7 +7,17 @@ import type { ArticleListItem } from "@/db/queries";
 import { deleteArticleAction } from "@/app/actions";
 import styles from "./ArticleCard.module.css";
 
-export default function ArticleCard({ article }: { article: ArticleListItem }) {
+export default function ArticleCard({
+  article,
+  selectionMode = false,
+  selected = false,
+  onSelectionChange,
+}: {
+  article: ArticleListItem;
+  selectionMode?: boolean;
+  selected?: boolean;
+  onSelectionChange?: (id: string) => void;
+}) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
   const visibleTags = article.tags.slice(0, 3);
@@ -27,7 +37,22 @@ export default function ArticleCard({ article }: { article: ArticleListItem }) {
   }
 
   return (
-    <article className={styles.card}>
+    <article
+      className={`${styles.card} ${selectionMode ? styles.selectionMode : ""} ${
+        selected ? styles.selected : ""
+      }`}
+    >
+      {selectionMode && (
+        <label className={styles.selector}>
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={() => onSelectionChange?.(article.id)}
+            className={styles.checkbox}
+          />
+          <span>{selected ? "Selected" : "Select"}</span>
+        </label>
+      )}
       <div className={styles.media}>
         {article.featuredImageUrl ? (
           <img
@@ -47,7 +72,7 @@ export default function ArticleCard({ article }: { article: ArticleListItem }) {
           </Link>
           <button
             onClick={handleDelete}
-            disabled={deleting}
+            disabled={deleting || selectionMode}
             className={styles.deleteBtn}
           >
             {deleting ? "..." : "Delete"}
