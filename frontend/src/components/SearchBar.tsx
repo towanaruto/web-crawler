@@ -3,7 +3,15 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export default function SearchBar({ defaultValue }: { defaultValue?: string }) {
+export default function SearchBar({
+  defaultValue,
+  sort,
+  direction,
+}: {
+  defaultValue?: string;
+  sort?: string;
+  direction?: string;
+}) {
   const [query, setQuery] = useState(defaultValue || "");
   const router = useRouter();
 
@@ -11,7 +19,18 @@ export default function SearchBar({ defaultValue }: { defaultValue?: string }) {
     e.preventDefault();
     const params = new URLSearchParams();
     if (query.trim()) params.set("q", query.trim());
+    if (sort) params.set("sort", sort);
+    if (direction) params.set("direction", direction);
     router.push(`/?${params.toString()}`);
+  }
+
+  function handleClear() {
+    const params = new URLSearchParams();
+    if (sort) params.set("sort", sort);
+    if (direction) params.set("direction", direction);
+    const qs = params.toString();
+    setQuery("");
+    router.push(qs ? `/?${qs}` : "/");
   }
 
   return (
@@ -29,10 +48,7 @@ export default function SearchBar({ defaultValue }: { defaultValue?: string }) {
       {defaultValue && (
         <button
           type="button"
-          onClick={() => {
-            setQuery("");
-            router.push("/");
-          }}
+          onClick={handleClear}
           style={styles.clear}
         >
           Clear

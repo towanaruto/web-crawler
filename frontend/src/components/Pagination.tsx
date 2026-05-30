@@ -4,10 +4,14 @@ export default function Pagination({
   currentPage,
   totalPages,
   query,
+  sort,
+  direction,
 }: {
   currentPage: number;
   totalPages: number;
   query?: string;
+  sort?: string;
+  direction?: string;
 }) {
   if (totalPages <= 1) return null;
 
@@ -15,6 +19,8 @@ export default function Pagination({
     const params = new URLSearchParams();
     if (page > 1) params.set("page", String(page));
     if (query) params.set("q", query);
+    if (sort) params.set("sort", sort);
+    if (direction) params.set("direction", direction);
     const qs = params.toString();
     return qs ? `/?${qs}` : "/";
   }
