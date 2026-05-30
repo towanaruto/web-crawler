@@ -1,0 +1,11 @@
+.heading {
+  font-size: 28px;
+  font-weight: var(--crawler-font-weight-emphasis);
+  margin: 0 0 var(--crawler-space-2);
+}
+
+.summary {
+  color: var(--crawler-text-tertiary);
+  font-size: 14px;
+  margin: 0 0 var(--crawler-space-3);
+}

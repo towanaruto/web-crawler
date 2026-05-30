@@ -2,7 +2,7 @@
  * Page-facing read queries. Wraps Drizzle to return shapes the React tree
  * consumes directly — no further mapping in components.
  */
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
 
 import { db } from "./client";
 import { articles, crawlTargets, type CrawlScheduleConfig } from "./schema";
@@ -21,6 +21,19 @@ export type ArticleListItem = {
   author: { id: string; name: string; slug: string } | null;
   category: { id: string; name: string; slug: string } | null;
   tags: { id: string; name: string; slug: string }[];
+};
+
+export const articleSortKeys = ["crawledAt", "title", "publishedAt"] as const;
+export type ArticleSortKey = (typeof articleSortKeys)[number];
+export type ArticleSortDirection = "asc" | "desc";
+export type ArticleSort = {
+  sort: ArticleSortKey;
+  direction: ArticleSortDirection;
+};
+
+export const DEFAULT_ARTICLE_SORT: ArticleSort = {
+  sort: "crawledAt",
+  direction: "desc",
 };
 
 export type ArticleDetail = ArticleListItem & {
@@ -50,8 +63,17 @@ export async function listArticles(opts: {
   search?: string;
   offset?: number;
   limit?: number;
+  sort?: ArticleSortKey;
+  direction?: ArticleSortDirection;
 }): Promise<{ items: ArticleListItem[]; total: number }> {
-  const { userId, search, offset = 0, limit = 20 } = opts;
+  const {
+    userId,
+    search,
+    offset = 0,
+    limit = 20,
+    sort = DEFAULT_ARTICLE_SORT.sort,
+    direction = DEFAULT_ARTICLE_SORT.direction,
+  } = opts;
 
   const searchWhere = search
     ? or(
@@ -72,7 +94,7 @@ export async function listArticles(opts: {
 
   const rows = await db.query.articles.findMany({
     where,
-    orderBy: [desc(articles.crawledAt)],
+    orderBy: getArticleOrderBy({ sort, direction }),
     offset,
     limit,
     with: {
@@ -83,6 +105,21 @@ export async function listArticles(opts: {
   });
 
   return { items: rows.map(toListItem), total };
+}
+
+export function normalizeArticleSort(
+  sort?: string,
+  direction?: string,
+): ArticleSort {
+  const safeSort = articleSortKeys.includes(sort as ArticleSortKey)
+    ? (sort as ArticleSortKey)
+    : DEFAULT_ARTICLE_SORT.sort;
+  const safeDirection =
+    direction === "asc" || direction === "desc"
+      ? direction
+      : DEFAULT_ARTICLE_SORT.direction;
+
+  return { sort: safeSort, direction: safeDirection };
 }
 
 export async function getArticleBySlug(
@@ -129,6 +166,30 @@ export async function listActiveCrawlTargets(userId: string): Promise<CrawlTarge
 }
 
 // ── Internals ────────────────────────────────────────────────────
+
+function getArticleOrderBy(sort: ArticleSort): SQL[] {
+  const timestampDirection =
+    sort.direction === "asc" ? sql`asc nulls last` : sql`desc nulls last`;
+
+  switch (sort.sort) {
+    case "title":
+      return [
+        sort.direction === "asc" ? asc(articles.title) : desc(articles.title),
+        desc(articles.crawledAt),
+      ];
+    case "publishedAt":
+      return [
+        sql`${articles.publishedAt} ${timestampDirection}`,
+        desc(articles.crawledAt),
+      ];
+    case "crawledAt":
+    default:
+      return [
+        sql`${articles.crawledAt} ${timestampDirection}`,
+        asc(articles.title),
+      ];
+  }
+}
 
 type ArticleRow = {
   id: string;
