@@ -170,7 +170,6 @@ def add_crawl_target(
     max_depth: int = 2,
     keywords: list[str] | None = None,
     keyword_mode: str = "any",
-    schedule: str | None = None,
 ) -> CrawlTarget:
     existing = db.scalar(
         select(CrawlTarget).where(
@@ -186,7 +185,6 @@ def add_crawl_target(
         existing.is_active = True
         existing.keywords = keywords if keywords is not None else (existing.keywords or [])
         existing.keyword_mode = keyword_mode
-        existing.schedule = schedule
         db.flush()
         return existing
 
@@ -198,7 +196,6 @@ def add_crawl_target(
         max_depth=max_depth,
         keywords=keywords or [],
         keyword_mode=keyword_mode,
-        schedule=schedule,
     )
     db.add(target)
     db.flush()

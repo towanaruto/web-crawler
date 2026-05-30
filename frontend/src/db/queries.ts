@@ -38,7 +38,6 @@ export type CrawlTargetItem = {
   isActive: boolean | null;
   keywords: string[];
   keywordMode: string;
-  schedule: string | null;
 };
 
 export async function listArticles(opts: {
@@ -116,7 +115,6 @@ export async function listActiveCrawlTargets(userId: string): Promise<CrawlTarge
     isActive: t.isActive,
     keywords: t.keywords ?? [],
     keywordMode: t.keywordMode ?? "any",
-    schedule: t.schedule,
   }));
 }
 

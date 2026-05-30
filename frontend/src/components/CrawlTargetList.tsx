@@ -88,9 +88,6 @@ export default function CrawlTargetList({
                 Keywords ({t.keywordMode}): {t.keywords.join(", ")}
               </span>
             )}
-            {t.schedule && (
-              <span style={styles.detail}>Schedule: {t.schedule}</span>
-            )}
           </div>
         </div>
       ))}

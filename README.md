@@ -164,8 +164,7 @@ docker compose --profile local-db up -d db
 docker compose run backend python -m src.cli add-target \
     "https://blog.example.com" \
     --mode static \
-    --keywords "AI,LLM" \
-    --schedule "0 */6 * * *"
+    --keywords "AI,LLM"
 ```
 
 または Vercel デプロイ後、フロントの `/targets` ページから追加。
@@ -178,6 +177,9 @@ docker compose run backend python -m src.cli add-target \
 どちらも Vercel Server Action から Render の FastAPI を呼び出す。
 Render backend は `BACKEND_API_TOKEN` で保護され、ログインユーザーの
 `user_id` に紐づく target だけをクロールする。
+
+旧 GitHub Actions の scheduled crawl は廃止済み。自動実行が必要な場合は、
+Render 側の worker / cron job など backend API に近い場所で改めて管理する。
 
 ### スキーマ変更
 

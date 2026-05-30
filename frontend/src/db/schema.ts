@@ -122,7 +122,6 @@ export const crawlTargets = pgTable("crawl_targets", {
   isActive: boolean("is_active").default(true),
   keywords: jsonb("keywords").$type<string[]>().default([]),
   keywordMode: varchar("keyword_mode", { length: 10 }).default("any"),
-  schedule: varchar("schedule", { length: 100 }),
 }, (t) => [
   uniqueIndex("uq_crawl_targets_user_base_url").on(t.userId, t.baseUrl),
   index("ix_crawl_targets_user_active").on(t.userId, t.isActive),
