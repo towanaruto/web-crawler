@@ -41,7 +41,7 @@ export default function CrawlTargetList({
 
   if (targets.length === 0) {
     return (
-      <p style={{ color: "#666", fontStyle: "italic" }}>
+      <p style={{ color: "var(--crawler-text-tertiary)", fontStyle: "italic" }}>
         No crawl targets configured yet.
       </p>
     );
@@ -101,65 +101,65 @@ const styles: Record<string, React.CSSProperties> = {
   list: {
     display: "flex",
     flexDirection: "column",
-    gap: 12,
+    gap: "var(--crawler-space-2)",
   },
   card: {
-    border: "1px solid #e5e7eb",
-    borderRadius: 8,
-    padding: 16,
-    backgroundColor: "#f3f4f6",
+    border: "1px solid var(--crawler-border-subtle)",
+    borderRadius: "var(--crawler-radius-lg)",
+    padding: "var(--crawler-space-2)",
+    backgroundColor: "var(--crawler-surface-raised)",
   },
   cardHeader: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: "var(--crawler-space-1)",
   },
   url: {
-    fontWeight: 600,
-    color: "#0369a1",
+    fontWeight: "var(--crawler-font-weight-emphasis)",
+    color: "var(--crawler-accent-primary)",
     textDecoration: "none",
-    fontSize: 15,
+    fontSize: "var(--crawler-font-size-md)",
   },
   actions: {
     display: "flex",
-    gap: 8,
+    gap: "var(--crawler-space-1)",
   },
   crawlBtn: {
-    backgroundColor: "#0369a1",
-    color: "#fff",
+    backgroundColor: "var(--crawler-accent-primary)",
+    color: "var(--crawler-text-on-accent)",
     border: "none",
-    borderRadius: 4,
-    padding: "6px 12px",
+    borderRadius: "var(--crawler-radius-pill)",
+    padding: "var(--crawler-space-1) var(--crawler-space-2)",
     cursor: "pointer",
-    fontSize: 13,
+    fontSize: "var(--crawler-font-size-caption)",
   },
   deactivateBtn: {
-    backgroundColor: "#dc2626",
-    color: "#fff",
+    backgroundColor: "var(--crawler-danger-primary)",
+    color: "var(--crawler-text-on-accent)",
     border: "none",
-    borderRadius: 4,
-    padding: "6px 12px",
+    borderRadius: "var(--crawler-radius-pill)",
+    padding: "var(--crawler-space-1) var(--crawler-space-2)",
     cursor: "pointer",
-    fontSize: 13,
+    fontSize: "var(--crawler-font-size-caption)",
   },
   meta: {
     display: "flex",
     flexWrap: "wrap",
-    gap: 12,
+    gap: "var(--crawler-space-2)",
     alignItems: "center",
-    fontSize: 13,
-    color: "#555",
+    fontSize: "var(--crawler-font-size-caption)",
+    color: "var(--crawler-text-secondary)",
   },
   badge: {
-    backgroundColor: "#e8f4f8",
-    color: "#0369a1",
-    padding: "2px 8px",
-    borderRadius: 4,
-    fontSize: 12,
-    fontWeight: 600,
+    backgroundColor: "var(--crawler-surface-bg)",
+    color: "var(--crawler-accent-primary)",
+    padding: "0 var(--crawler-space-1)",
+    borderRadius: "var(--crawler-radius-pill)",
+    fontSize: "var(--crawler-font-size-micro)",
+    fontWeight: "var(--crawler-font-weight-emphasis)",
   },
   detail: {
-    color: "#666",
+    color: "var(--crawler-text-tertiary)",
   },
 };

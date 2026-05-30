@@ -34,22 +34,22 @@ const styles: Record<string, React.CSSProperties> = {
   wrapper: {
     display: "flex",
     alignItems: "center",
-    gap: 12,
-    marginBottom: 16,
+    gap: "var(--crawler-space-2)",
+    marginBottom: "var(--crawler-space-2)",
   },
   btn: {
-    backgroundColor: "#0369a1",
-    color: "#fff",
+    backgroundColor: "var(--crawler-accent-primary)",
+    color: "var(--crawler-text-on-accent)",
     border: "none",
-    borderRadius: 6,
-    padding: "10px 20px",
+    borderRadius: "var(--crawler-radius-pill)",
+    padding: "var(--crawler-space-1) var(--crawler-space-3)",
     cursor: "pointer",
-    fontSize: 14,
-    fontWeight: 600,
+    fontSize: "var(--crawler-font-size-sm)",
+    fontWeight: "var(--crawler-font-weight-emphasis)",
   },
   result: {
-    fontSize: 13,
-    color: "#555",
+    fontSize: "var(--crawler-font-size-caption)",
+    color: "var(--crawler-text-secondary)",
   },
 };
 
